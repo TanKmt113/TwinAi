@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: twinai-postgres
+    environment:
+      POSTGRES_DB: twinai
+      POSTGRES_USER: twinai
+      POSTGRES_PASSWORD: twinai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twinai -d twinai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: twinai-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/twinai-neo4j-password
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j:/var/lib/neo4j/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p twinai-neo4j-password 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: twinai-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: twinai
+      MINIO_ROOT_PASSWORD: twinai-minio-password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  n8n:
+    image: n8nio/n8n:1.114.4
+    container_name: twinai-n8n
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  backend:
+    build:
+      context: ../apps/api
+    container_name: twinai-api
+    environment:
+      CORS_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgresql+psycopg://twinai:twinai@postgres:5432/twinai
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: twinai-neo4j-password
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: twinai
+      MINIO_SECRET_KEY: twinai-minio-password
+      MINIO_SECURE: "false"
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/twinai
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../apps/web
+    container_name: twinai-web
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  minio_data:
+  n8n_data:
