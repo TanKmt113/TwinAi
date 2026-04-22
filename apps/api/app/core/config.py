@@ -6,7 +6,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 API_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def find_repo_root(start: Path) -> Path:
+    for path in (start, *start.parents):
+        if (path / "infra" / "docker-compose.yml").exists() or (path / ".git").exists():
+            return path
+    return start
+
+
+REPO_ROOT = find_repo_root(API_ROOT)
 
 
 class Settings(BaseSettings):

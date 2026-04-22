@@ -117,3 +117,5 @@ class ChatResponse(BaseModel):
     recommended_actions: list[str]
     missing_data: list[str]
     citations: list[Citation]
+    agent_mode: str = "rule_fallback"
+    tool_calls: list[str] = []
