@@ -4,18 +4,6 @@ from typing import Any
 from pydantic import BaseModel
 
 
-class AssetRead(BaseModel):
-    id: str
-    code: str
-    name: str
-    asset_type: str
-    location: str | None
-    department_owner: str | None
-    status: str
-
-    model_config = {"from_attributes": True}
-
-
 class ComponentRead(BaseModel):
     id: str
     code: str
@@ -24,6 +12,19 @@ class ComponentRead(BaseModel):
     remaining_lifetime_months: int | None
     spare_part_code: str | None
     status: str
+
+    model_config = {"from_attributes": True}
+
+
+class AssetRead(BaseModel):
+    id: str
+    code: str
+    name: str
+    asset_type: str
+    location: str | None
+    department_owner: str | None
+    status: str
+    components: list[ComponentRead] = []
 
     model_config = {"from_attributes": True}
 
@@ -72,4 +73,3 @@ class ReasoningRunResponse(BaseModel):
     created_tasks: list[InspectionTaskRead]
     created_purchase_requests: list[PurchaseRequestRead]
     audit_events: list[dict[str, Any]]
-

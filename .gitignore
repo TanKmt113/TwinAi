@@ -10,6 +10,7 @@ node_modules/
 .next/
 out/
 dist/
+*.tsbuildinfo
 
 # Env
 .env
@@ -18,4 +19,3 @@ dist/
 
 # Docker/runtime
 *.log
-

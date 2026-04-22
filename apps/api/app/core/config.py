@@ -28,7 +28,13 @@ class Settings(BaseSettings):
     minio_secret_key: str = Field(default="twinai-minio-password", alias="MINIO_SECRET_KEY")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
 
+    llm_provider: str = Field(default="gemini", alias="LLM_PROVIDER")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
+    openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_embedding_model: str = Field(default="gemini-embedding-001", alias="GEMINI_EMBEDDING_MODEL")
     n8n_webhook_url: str = Field(default="", alias="N8N_WEBHOOK_URL")
 
     @property

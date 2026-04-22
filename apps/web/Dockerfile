@@ -1,7 +1,7 @@
 FROM node:22-slim AS deps
 WORKDIR /app
 COPY package.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 FROM node:22-slim AS runner
 WORKDIR /app

@@ -2,7 +2,7 @@
 
 Codebase MVP cho hệ thống Agentic AI Ontology nội bộ.
 
-Phase hiện tại: **Phase 02 - Data + Neo4j + Rule Engine**.
+Phase hiện tại: **Phase 03 - Dashboard + Ontology Map**.
 
 ## Cấu trúc chính
 
@@ -38,7 +38,25 @@ curl http://localhost:8000/health
 curl http://localhost:8000/health/dependencies
 ```
 
-## Phase 2 API
+## Phase 3 Dashboard
+
+Frontend tại:
+
+```text
+http://localhost:3000
+```
+
+Dashboard hiện có:
+
+- Số lượng tài sản, rủi ro, task mở, purchase request.
+- Bảng thang máy và linh kiện.
+- Nút `Chạy suy luận`.
+- Danh sách agent runs.
+- Task kiểm tra.
+- Purchase request draft.
+- Ontology map cho chuỗi thang máy -> linh kiện -> rule -> manual -> mua hàng -> phê duyệt.
+
+## Phase 2 API vẫn dùng
 
 Sau khi stack chạy:
 
@@ -59,4 +77,4 @@ Phase 2 đã thêm:
 
 ## Phase tiếp theo
 
-Phase 03 sẽ thêm dashboard đầy đủ và Ontology Map tương tác.
+Phase 04 sẽ thêm upload manual, parse/chunk, embedding, pgvector search và chat/RAG có citations.

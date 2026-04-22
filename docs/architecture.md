@@ -1,6 +1,6 @@
 # Architecture Phase 1
 
-Phase 1 dựng nền kỹ thuật cho MVP Agentic AI Ontology.
+Phase 3 đã có dashboard vận hành đọc dữ liệu từ backend và hiển thị Ontology map.
 
 ```text
 Next.js Web
@@ -13,7 +13,7 @@ Next.js Web
 
 ## Vai trò service
 
-- `frontend`: dashboard health/status ban đầu.
+- `frontend`: dashboard vận hành, nút chạy reasoning, bảng task/purchase request và Ontology map.
 - `backend`: API health, cấu hình môi trường và entrypoint cho service sau này.
 - `postgres`: dữ liệu giao dịch, audit, pgvector.
 - `neo4j`: Ontology graph.
@@ -26,4 +26,3 @@ Next.js Web
 - Neo4j là source of truth cho quan hệ Ontology.
 - MinIO lưu file gốc.
 - LLM chưa được kích hoạt ở Phase 1.
-

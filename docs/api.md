@@ -21,6 +21,28 @@ GET  /api/inspection-tasks
 GET  /api/purchase-requests
 ```
 
+## Frontend proxy Phase 3
+
+Next.js frontend có proxy route:
+
+```text
+/api/backend/{backend_path}
+```
+
+Ví dụ browser gọi:
+
+```text
+POST /api/backend/api/reasoning/run
+```
+
+Proxy sẽ chuyển tiếp tới backend:
+
+```text
+POST http://backend:8000/api/reasoning/run
+```
+
+Lý do: trong Docker, hostname `backend` chỉ truy cập được từ server/container, không truy cập trực tiếp được từ browser.
+
 ## `POST /api/reasoning/run`
 
 Chạy rule `R-ELV-CABLE-001` trên dữ liệu thang máy.
