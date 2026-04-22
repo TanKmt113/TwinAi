@@ -2,7 +2,7 @@
 
 Codebase MVP cho hệ thống Agentic AI Ontology nội bộ.
 
-Phase hiện tại: **Phase 01 - Nền tảng kiến trúc**.
+Phase hiện tại: **Phase 02 - Data + Neo4j + Rule Engine**.
 
 ## Cấu trúc chính
 
@@ -38,13 +38,25 @@ curl http://localhost:8000/health
 curl http://localhost:8000/health/dependencies
 ```
 
-## Phase tiếp theo
+## Phase 2 API
 
-Phase 02 sẽ thêm:
+Sau khi stack chạy:
 
-- PostgreSQL schema nghiệp vụ.
-- Seed data thang máy.
-- Neo4j graph cho Ontology.
+```bash
+curl http://localhost:8000/api/assets
+curl -X POST http://localhost:8000/api/reasoning/run
+curl http://localhost:8000/api/inspection-tasks
+curl http://localhost:8000/api/purchase-requests
+```
+
+Phase 2 đã thêm:
+
+- PostgreSQL schema nghiệp vụ bằng SQLAlchemy.
+- Seed data thang máy từ tài liệu 07.
+- Neo4j Sync Service cho Ontology graph.
 - Rule Engine `R-ELV-CABLE-001`.
 - API `POST /api/reasoning/run`.
 
+## Phase tiếp theo
+
+Phase 03 sẽ thêm dashboard đầy đủ và Ontology Map tương tác.

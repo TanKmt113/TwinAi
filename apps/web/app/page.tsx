@@ -49,13 +49,13 @@ export default async function Home() {
 
         <article className="card">
           <p className="eyebrow">Roadmap</p>
-          <h2>Thứ tự phát triển</h2>
+          <h2>Phase 2 đã sẵn sàng API lõi</h2>
           <ol className="phase-list">
-            <li>Nền tảng kiến trúc.</li>
-            <li>Data + Neo4j + Rule Engine.</li>
-            <li>Dashboard + Ontology Map.</li>
-            <li>Manual + RAG + Chat.</li>
-            <li>Approval + Notification + Audit.</li>
+            <li><code>GET /api/assets</code></li>
+            <li><code>GET /api/assets/:id/ontology</code></li>
+            <li><code>POST /api/reasoning/run</code></li>
+            <li><code>GET /api/inspection-tasks</code></li>
+            <li><code>GET /api/purchase-requests</code></li>
           </ol>
         </article>
 
@@ -63,12 +63,11 @@ export default async function Home() {
           <p className="eyebrow">MVP focus</p>
           <h2>Use case thang máy</h2>
           <p className="muted">
-            Phase 1 chỉ dựng nền. Phase 2 sẽ seed dữ liệu Calidas 1, tạo graph Neo4j và chạy rule
-            R-ELV-CABLE-001.
+            Backend đã seed dữ liệu Calidas 1, tạo schema nghiệp vụ, đồng bộ graph Neo4j khi có kết nối
+            và chạy rule R-ELV-CABLE-001 qua API reasoning.
           </p>
         </article>
       </section>
     </main>
   );
 }
-
