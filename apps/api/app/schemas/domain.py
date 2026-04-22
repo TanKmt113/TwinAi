@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ComponentRead(BaseModel):
@@ -118,4 +118,4 @@ class ChatResponse(BaseModel):
     missing_data: list[str]
     citations: list[Citation]
     agent_mode: str = "rule_fallback"
-    tool_calls: list[str] = []
+    tool_calls: list[str] = Field(default_factory=list)

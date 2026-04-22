@@ -89,6 +89,8 @@ export type ChatResponse = {
   evidence: string[];
   recommended_actions: string[];
   missing_data: string[];
+  agent_mode?: string;
+  tool_calls?: string[];
   citations: Array<{
     type: string;
     code: string;

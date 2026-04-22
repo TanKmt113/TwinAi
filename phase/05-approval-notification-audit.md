@@ -69,6 +69,28 @@ Payload gợi ý:
 }
 ```
 
+## Agentic action flow
+
+```text
+Reasoning Agent phát hiện rule kích hoạt
+  -> Action Agent tạo inspection task nếu chưa tồn tại
+  -> Action Agent kiểm tra tồn kho và lead time
+  -> Action Agent tạo purchase request draft nếu đủ điều kiện
+  -> Approval Agent xác định approval policy và final approver
+  -> Notification Agent gửi n8n webhook khi request chờ duyệt
+  -> Audit Service ghi lại toàn bộ hành động
+```
+
+Guardrail:
+
+```text
+Agent chỉ tạo draft.
+Agent không submit request thay người.
+Agent không approve/reject thay người.
+Mọi action phải có audit log.
+Notification failure không rollback dữ liệu chính.
+```
+
 ## Audit log cần ghi
 
 ```text
@@ -123,4 +145,3 @@ Phase 05 đạt khi:
 | Thiếu truy vết | Mọi action phải ghi audit log |
 | Notification lỗi làm hỏng workflow | Notification failure không rollback dữ liệu chính |
 | Sai người phê duyệt | Approval policy phải được cấu hình rõ và audit được |
-

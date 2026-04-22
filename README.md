@@ -57,6 +57,7 @@ Dashboard hiện có:
 - Ontology map cho chuỗi thang máy -> linh kiện -> rule -> manual -> mua hàng -> phê duyệt.
 - Khu upload/parse manual.
 - Chat/RAG hỏi đáp có citations.
+- Chat agent có tool context (`get_asset_risks`, `get_asset_ontology`, `search_manual_chunks`, approval/purchase context). Nếu cấu hình `GEMINI_API_KEY` hoặc `OPENAI_API_KEY`, backend gọi LLM để tổng hợp JSON có guardrail; nếu chưa có key, hệ thống fallback sang rule-based response và vẫn ghi agent run.
 
 ## Phase 2 API vẫn dùng
 
@@ -76,6 +77,16 @@ curl http://localhost:8000/api/manuals
 curl -X POST http://localhost:8000/api/chat/query \
   -H "content-type: application/json" \
   -d '{"question":"Có thang máy nào sắp cần kiểm tra hoặc thay linh kiện không?"}'
+```
+
+Muốn bật LLM tool agent cho chat:
+
+```bash
+# mặc định dùng Gemini
+GEMINI_API_KEY=... docker compose up --build
+
+# hoặc chuyển sang OpenAI
+LLM_PROVIDER=openai OPENAI_API_KEY=... docker compose up --build
 ```
 
 Phase 2 đã thêm:

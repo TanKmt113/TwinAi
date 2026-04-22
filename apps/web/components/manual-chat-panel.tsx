@@ -134,10 +134,22 @@ export function ManualChatPanel({ manuals }: ManualChatPanelProps) {
 }
 
 function ChatAnswer({ answer }: { answer: ChatResponse }) {
+  const toolCalls = answer.tool_calls ?? [];
+
   return (
     <div className="chat-answer">
       <strong>{answer.conclusion}</strong>
       <span>Intent: {answer.intent}</span>
+      <span>Agent: {answer.agent_mode ?? "unknown"}</span>
+      <div>
+        <p className="mini-heading">Tool calls</p>
+        <ul>
+          {toolCalls.map((tool) => (
+            <li key={tool}>{tool}</li>
+          ))}
+          {!toolCalls.length ? <li>Không có tool call.</li> : null}
+        </ul>
+      </div>
       <div>
         <p className="mini-heading">Evidence</p>
         <ul>
@@ -161,4 +173,3 @@ function ChatAnswer({ answer }: { answer: ChatResponse }) {
     </div>
   );
 }
-

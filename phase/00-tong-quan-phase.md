@@ -38,6 +38,22 @@ Thang máy Calidas 1
   -> Chat trả lời có căn cứ
 ```
 
+## Agentic workflow cần chứng minh
+
+```text
+Trigger: user hỏi chat / bấm chạy suy luận / job định kỳ
+  -> Agent Orchestrator tạo agent_run và chọn tool
+  -> Ontology Agent lấy graph context từ Neo4j
+  -> RAG Agent tìm manual chunk và citations
+  -> Reasoning Agent chạy rule deterministic
+  -> Action Agent tạo task hoặc purchase request draft nếu đủ điều kiện
+  -> Approval Agent xác định policy và người phê duyệt
+  -> Notification Agent gửi n8n webhook nếu cần
+  -> Response Agent dùng LLM để tổng hợp JSON có căn cứ
+```
+
+Nguyên tắc: LLM chỉ diễn giải và gọi tool có schema. Rule Engine, Ontology và Domain Services mới là nơi quyết định nghiệp vụ.
+
 ## Deliverable cuối cùng
 
 MVP được xem là đạt khi người dùng có thể:
@@ -51,4 +67,3 @@ MVP được xem là đạt khi người dùng có thể:
 7. Hỏi bằng tiếng Việt và nhận câu trả lời có căn cứ.
 8. Phê duyệt hoặc từ chối purchase request.
 9. Xem audit log cho toàn bộ hành động.
-

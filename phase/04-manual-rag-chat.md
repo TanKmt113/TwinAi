@@ -64,6 +64,27 @@ get_purchase_request_reason(request_id)
 get_approval_policy(request_type)
 ```
 
+## Chat agent flow
+
+```text
+User question
+  -> Chat Agent phân loại intent
+  -> gom tool context từ Ontology/RAG/Rule/Purchase/Approval
+  -> nếu có GEMINI_API_KEY hoặc OPENAI_API_KEY: gọi LLM để tổng hợp JSON
+  -> nếu không có key hoặc LLM lỗi: fallback rule-based response
+  -> ghi agent_run với agent_mode và tool_calls
+```
+
+`agent_mode` cần thể hiện rõ trạng thái:
+
+```text
+llm_tool_agent:gemini
+llm_tool_agent:openai
+rule_fallback_no_llm_key
+rule_fallback_after_llm_error
+guardrail_out_of_scope
+```
+
 ## Guardrail
 
 LLM phải tuân thủ:
@@ -81,11 +102,14 @@ Mỗi kết luận quan trọng phải có citation.
 
 ```json
 {
+  "intent": "",
   "conclusion": "",
   "evidence": [],
   "recommended_actions": [],
   "missing_data": [],
-  "citations": []
+  "citations": [],
+  "agent_mode": "",
+  "tool_calls": []
 }
 ```
 
@@ -97,8 +121,8 @@ Mỗi kết luận quan trọng phải có citation.
 - Tạo embedding.
 - Search manual chunk bằng pgvector.
 - Link `Rule -> Manual` trong Neo4j.
-- Chat endpoint trả lời có citations.
-- UI chat đơn giản.
+- Chat endpoint trả lời có citations, `agent_mode` và `tool_calls`.
+- UI chat hiển thị intent, agent mode, tool calls, evidence và citations.
 
 ## Tiêu chí hoàn thành
 
@@ -138,4 +162,3 @@ Không đủ dữ liệu.
 | Manual parse sai | Hiển thị chunk/source để người dùng kiểm tra |
 | Embedding tìm sai đoạn | Cho phép filter theo manual/department/domain |
 | LLM hallucination | Nếu không có citation thì không cho kết luận chắc chắn |
-
