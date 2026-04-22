@@ -43,6 +43,57 @@ POST http://backend:8000/api/reasoning/run
 
 Lý do: trong Docker, hostname `backend` chỉ truy cập được từ server/container, không truy cập trực tiếp được từ browser.
 
+## Phase 4 Manual + RAG + Chat
+
+```text
+POST /api/manuals/upload
+GET  /api/manuals
+GET  /api/manuals/{manual_id}
+POST /api/manuals/{manual_id}/parse
+GET  /api/manuals/{manual_id}/chunks
+POST /api/chat/query
+GET  /api/llm/health
+```
+
+## `GET /api/llm/health`
+
+Kiểm tra backend có gọi được Gemini API thật bằng `GEMINI_API_KEY` hay không.
+
+Response thành công:
+
+```json
+{
+  "provider": "gemini",
+  "configured": true,
+  "reachable": true,
+  "model": "gemini-2.5-flash",
+  "response_text": "ok"
+}
+```
+
+## `POST /api/chat/query`
+
+Request:
+
+```json
+{
+  "question": "Có thang máy nào sắp cần kiểm tra hoặc thay linh kiện không?"
+}
+```
+
+Response:
+
+```json
+{
+  "intent": "asset_risk_query",
+  "conclusion": "Có 1 linh kiện cần chú ý: Cáp kéo Calidas 1.",
+  "evidence": [],
+  "recommended_actions": [],
+  "missing_data": [],
+  "citations": []
+}
+```
+
 ## `POST /api/reasoning/run`
 
 Chạy rule `R-ELV-CABLE-001` trên dữ liệu thang máy.

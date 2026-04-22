@@ -25,6 +25,10 @@ export type Asset = {
   components: Component[];
 };
 
+type ApiAsset = Omit<Asset, "components"> & {
+  components?: Component[] | null;
+};
+
 export type InspectionTask = {
   id: string;
   title: string;
@@ -58,6 +62,40 @@ export type AgentRun = {
 
 export type OntologyContext = Record<string, unknown>;
 
+export type Manual = {
+  id: string;
+  code: string;
+  title: string;
+  department_owner: string | null;
+  file_name: string;
+  file_type: string | null;
+  version: string | null;
+  status: string;
+};
+
+export type ManualChunk = {
+  id: string;
+  manual_id: string;
+  chunk_index: number;
+  heading: string | null;
+  page_number: number | null;
+  chunk_text: string;
+  metadata_json: Record<string, unknown>;
+};
+
+export type ChatResponse = {
+  intent: string;
+  conclusion: string;
+  evidence: string[];
+  recommended_actions: string[];
+  missing_data: string[];
+  citations: Array<{
+    type: string;
+    code: string;
+    title: string;
+  }>;
+};
+
 export type ReasoningResponse = {
   run_id: string;
   status: string;
@@ -80,14 +118,16 @@ export async function getApiHealth(): Promise<HealthResponse> {
 }
 
 export async function getDashboardData() {
-  const [health, assets, tasks, purchaseRequests, agentRuns] = await Promise.all([
+  const [health, apiAssets, tasks, purchaseRequests, agentRuns, manuals] = await Promise.all([
     getApiHealth(),
-    getServerJson<Asset[]>("/api/assets", []),
+    getServerJson<ApiAsset[]>("/api/assets", []),
     getServerJson<InspectionTask[]>("/api/inspection-tasks", []),
     getServerJson<PurchaseRequest[]>("/api/purchase-requests", []),
     getServerJson<AgentRun[]>("/api/agent-runs", []),
+    getServerJson<Manual[]>("/api/manuals", []),
   ]);
 
+  const assets = apiAssets.map(normalizeAsset);
   const selectedAsset = assets[0];
   const ontology = selectedAsset ? await getServerJson<OntologyContext>(`/api/assets/${selectedAsset.code}/ontology`, {}) : {};
 
@@ -97,8 +137,16 @@ export async function getDashboardData() {
     tasks,
     purchaseRequests,
     agentRuns,
+    manuals,
     selectedAsset,
     ontology,
+  };
+}
+
+function normalizeAsset(asset: ApiAsset): Asset {
+  return {
+    ...asset,
+    components: Array.isArray(asset.components) ? asset.components : [],
   };
 }
 
@@ -112,6 +160,51 @@ export async function runReasoningFromBrowser(): Promise<ReasoningResponse> {
 
   if (!response.ok) {
     throw new Error(`Reasoning failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function uploadManualFromBrowser(file: File): Promise<Manual> {
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("title", file.name);
+
+  const response = await fetch("/api/backend/api/manuals/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function parseManualFromBrowser(manualId: string): Promise<ManualChunk[]> {
+  const response = await fetch(`/api/backend/api/manuals/${manualId}/parse`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Parse failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function queryChatFromBrowser(question: string): Promise<ChatResponse> {
+  const response = await fetch("/api/backend/api/chat/query", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Chat failed with status ${response.status}`);
   }
 
   return response.json();
@@ -132,4 +225,3 @@ async function getServerJson<T>(path: string, fallback: T): Promise<T> {
     return fallback;
   }
 }
-

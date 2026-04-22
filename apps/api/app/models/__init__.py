@@ -6,6 +6,7 @@ from app.models.domain import (
     InspectionTask,
     InventoryItem,
     Manual,
+    ManualChunk,
     PurchaseRequest,
     Rule,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "InspectionTask",
     "InventoryItem",
     "Manual",
+    "ManualChunk",
     "PurchaseRequest",
     "Rule",
 ]

@@ -53,6 +53,31 @@ class PurchaseRequestRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ManualRead(BaseModel):
+    id: str
+    code: str
+    title: str
+    department_owner: str | None
+    file_name: str
+    file_type: str | None
+    version: str | None
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class ManualChunkRead(BaseModel):
+    id: str
+    manual_id: str
+    chunk_index: int
+    heading: str | None
+    page_number: int | None
+    chunk_text: str
+    metadata_json: dict[str, Any]
+
+    model_config = {"from_attributes": True}
+
+
 class AgentRunRead(BaseModel):
     id: str
     run_type: str
@@ -73,3 +98,22 @@ class ReasoningRunResponse(BaseModel):
     created_tasks: list[InspectionTaskRead]
     created_purchase_requests: list[PurchaseRequestRead]
     audit_events: list[dict[str, Any]]
+
+
+class ChatQuery(BaseModel):
+    question: str
+
+
+class Citation(BaseModel):
+    type: str
+    code: str
+    title: str
+
+
+class ChatResponse(BaseModel):
+    intent: str
+    conclusion: str
+    evidence: list[str]
+    recommended_actions: list[str]
+    missing_data: list[str]
+    citations: list[Citation]

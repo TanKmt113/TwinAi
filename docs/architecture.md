@@ -1,6 +1,6 @@
 # Architecture Phase 1
 
-Phase 3 đã có dashboard vận hành đọc dữ liệu từ backend và hiển thị Ontology map.
+Phase 4 đã có dashboard vận hành, Ontology map, upload/parse manual và Chat/RAG có citations.
 
 ```text
 Next.js Web
@@ -13,11 +13,12 @@ Next.js Web
 
 ## Vai trò service
 
-- `frontend`: dashboard vận hành, nút chạy reasoning, bảng task/purchase request và Ontology map.
+- `frontend`: dashboard vận hành, nút chạy reasoning, bảng task/purchase request, Ontology map, manual upload và chat panel.
 - `backend`: API health, cấu hình môi trường và entrypoint cho service sau này.
 - `postgres`: dữ liệu giao dịch, audit, pgvector.
 - `neo4j`: Ontology graph.
 - `minio`: lưu manual/file gốc.
+- `manual_chunks`: lưu nội dung đã parse/chunk trong PostgreSQL để phục vụ RAG.
 - `n8n`: automation/notification.
 
 ## Ranh giới dữ liệu

@@ -1,9 +1,10 @@
+import { ManualChatPanel } from "../components/manual-chat-panel";
 import { OntologyMap } from "../components/ontology-map";
 import { ReasoningControls } from "../components/reasoning-controls";
 import { getDashboardData } from "../lib/api";
 
 export default async function Home() {
-  const { health, assets, tasks, purchaseRequests, agentRuns, selectedAsset, ontology } = await getDashboardData();
+  const { health, assets, tasks, purchaseRequests, agentRuns, manuals, selectedAsset, ontology } = await getDashboardData();
   const isOnline = health.status === "ok";
   const riskyAssets = assets.filter((asset) =>
     asset.components.some((component) => (component.remaining_lifetime_months ?? 999) <= 6),
@@ -126,6 +127,17 @@ export default async function Home() {
         <OntologyMap asset={selectedAsset} ontology={ontology} purchaseRequests={purchaseRequests} />
       </section>
 
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Phase 04</p>
+            <h2>Manual + RAG + Chat</h2>
+          </div>
+          <span className="muted">Guardrail: chỉ trả lời khi có dữ liệu/rule/citation</span>
+        </div>
+        <ManualChatPanel manuals={manuals} />
+      </section>
+
       <section className="dashboard-grid">
         <article className="card">
           <p className="eyebrow">Inspection tasks</p>
@@ -168,4 +180,3 @@ function Metric({ title, value, detail, tone }: { title: string; value: number; 
     </article>
   );
 }
-

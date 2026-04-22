@@ -84,6 +84,20 @@ class Manual(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class ManualChunk(Base):
+    __tablename__ = "manual_chunks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    manual_id: Mapped[str] = mapped_column(String(36), ForeignKey("manuals.id"), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading: Mapped[str | None] = mapped_column(String(255))
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding_json: Mapped[list[float]] = mapped_column(JSONType, nullable=False, default=list)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Rule(Base):
     __tablename__ = "rules"
 

@@ -16,10 +16,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
   const response = await fetch(targetUrl, {
     method: request.method,
-    headers: {
-      "content-type": request.headers.get("content-type") ?? "application/json",
-    },
-    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
+    headers: buildHeaders(request),
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
     cache: "no-store",
   });
 
@@ -40,3 +38,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   return proxy(request, context);
 }
 
+function buildHeaders(request: NextRequest) {
+  const headers = new Headers();
+  const contentType = request.headers.get("content-type");
+  if (contentType) {
+    headers.set("content-type", contentType);
+  }
+  return headers;
+}

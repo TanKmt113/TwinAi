@@ -2,7 +2,7 @@
 
 Codebase MVP cho hệ thống Agentic AI Ontology nội bộ.
 
-Phase hiện tại: **Phase 03 - Dashboard + Ontology Map**.
+Phase hiện tại: **Phase 04 - Manual + RAG + Chat**.
 
 ## Cấu trúc chính
 
@@ -55,6 +55,8 @@ Dashboard hiện có:
 - Task kiểm tra.
 - Purchase request draft.
 - Ontology map cho chuỗi thang máy -> linh kiện -> rule -> manual -> mua hàng -> phê duyệt.
+- Khu upload/parse manual.
+- Chat/RAG hỏi đáp có citations.
 
 ## Phase 2 API vẫn dùng
 
@@ -67,6 +69,15 @@ curl http://localhost:8000/api/inspection-tasks
 curl http://localhost:8000/api/purchase-requests
 ```
 
+## Phase 4 API
+
+```bash
+curl http://localhost:8000/api/manuals
+curl -X POST http://localhost:8000/api/chat/query \
+  -H "content-type: application/json" \
+  -d '{"question":"Có thang máy nào sắp cần kiểm tra hoặc thay linh kiện không?"}'
+```
+
 Phase 2 đã thêm:
 
 - PostgreSQL schema nghiệp vụ bằng SQLAlchemy.
@@ -77,4 +88,4 @@ Phase 2 đã thêm:
 
 ## Phase tiếp theo
 
-Phase 04 sẽ thêm upload manual, parse/chunk, embedding, pgvector search và chat/RAG có citations.
+Phase 05 sẽ thêm approval UI, notification qua n8n và audit log viewer.
