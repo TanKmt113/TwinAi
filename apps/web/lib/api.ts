@@ -86,6 +86,30 @@ export type AuditLogEntry = {
   created_at: string;
 };
 
+export type OrgUnit = {
+  id: string;
+  code: string;
+  name: string;
+  level_kind: string;
+  parent_id: string | null;
+  sort_order: number;
+};
+
+export type OrgUser = {
+  id: string;
+  user_code: string;
+  full_name: string;
+  email: string | null;
+  job_title: string | null;
+  org_unit_id: string | null;
+  org_unit_code: string | null;
+  org_unit_name: string | null;
+  manager_user_id: string | null;
+  manager_user_code: string | null;
+  role_tags: string[];
+  is_active: boolean;
+};
+
 export type OrgUserBrief = {
   user_code: string;
   full_name: string;
@@ -205,6 +229,14 @@ export async function getApiHealth(): Promise<HealthResponse> {
 
 export async function getSystemServicesHealth(): Promise<SystemServicesResponse> {
   return getServerJson<SystemServicesResponse>("/health/services", fallbackSystemServices);
+}
+
+export async function fetchOrgUnitsFromServer(): Promise<OrgUnit[]> {
+  return getServerJson<OrgUnit[]>("/api/org/units", []);
+}
+
+export async function fetchOrgUsersFromServer(): Promise<OrgUser[]> {
+  return getServerJson<OrgUser[]>("/api/org/users", []);
 }
 
 export async function getDashboardData() {

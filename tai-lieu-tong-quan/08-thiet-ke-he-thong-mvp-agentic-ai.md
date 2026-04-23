@@ -93,40 +93,88 @@ Deploy: Docker Compose nội bộ
 ## 4. Kiến trúc tổng thể
 
 ```text
+[Sơ đồ kiến trúc mục tiêu theo roadmap Phase 01-10; MVP ban đầu ưu tiên Phase 01-06,
+Digital Twin realtime mở rộng ở Phase 07-10]
+
 ┌─────────────────────────────────────────────────────────────┐
 │                         Next.js UI                          │
 │ Dashboard | Ontology Map | Chat | Task | Purchase | Admin    │
-│ Approval Queue | Notification / Escalation Viewer            │
+│ Approval Queue | Notification/Escalation | Telemetry | 3D Twin│
 └──────────────────────────────┬──────────────────────────────┘
-                               │ REST/JSON
+                               │ REST/JSON, polling/SSE/WebSocket
 ┌──────────────────────────────▼──────────────────────────────┐
 │                         FastAPI API                         │
 │ Auth | Asset API | Manual API | Rule API | Chat API          │
+│ Org API | Approval API | Audit API | Telemetry API | Twin API │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ user request / job / reading
+┌──────────────────────────────▼──────────────────────────────┐
+│                    Agentic Workflow Layer                   │
+│                                                             │
+│  Chat Agent ───────────────▶ Agent Orchestrator             │
+│  - hiểu câu hỏi              - chọn agent/tool cần gọi       │
+│  - gọi LLM nếu có key         - kiểm soát guardrail           │
+│  - trả JSON có citation       - ghi agent run/event           │
+│                                                             │
+│  Ontology Agent ───────────▶ Reasoning Agent                 │
+│  - lấy graph Neo4j            - chạy rule deterministic       │
+│  - asset/component context    - phát hiện rủi ro/finding      │
+│  - quan hệ nguồn              - không để LLM quyết định       │
+│                                                             │
+│  RAG Agent ─────────────────▶ Action Agent                   │
+│  - tìm manual chunk           - tạo inspection task           │
+│  - citations                  - tạo purchase draft            │
+│  - căn cứ kỹ thuật            - không auto approve            │
+│                                                             │
+│  Approval Agent ────────────▶ Notification Agent             │
+│  - tìm policy/approver        - route contact/escalation      │
+│  - human gate                 - gửi n8n webhook, ghi trạng thái│
+│                                                             │
+│  Telemetry Agent ───────────▶ Realtime Rule Agent            │
+│  - nhận sensor reading        - kiểm tra threshold/window     │
+│  - chuẩn hóa metric/quality   - tạo/update SensorAlert        │
+│  - attach evidence            - kích hoạt task/chat context   │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ tool calls / state / audit
+┌──────────────────────────────▼──────────────────────────────┐
+│                    Backend Domain Services                  │
+│ Ontology Service | Rule Engine | RAG Service | Purchase API  │
+│ Approval | Org Routing | Audit | Notification | Telemetry    │
+│ Realtime Rules | Sensor Alert | 3D Twin State | Object Store │
 └──────────────┬───────────────┬───────────────┬──────────────┘
                │               │               │
 ┌──────────────▼───┐   ┌───────▼────────┐  ┌───▼──────────────┐
-│ PostgreSQL       │   │ MinIO          │  │ OpenAI API        │
+│ PostgreSQL       │   │ MinIO          │  │ OpenAI/Gemini API │
 │ business data    │   │ manual files   │  │ LLM + embedding   │
-│ pgvector         │   │ originals      │  │                  │
-└──────────────┬───┘   └────────────────┘  └───┬──────────────┘
-               │                                │
-┌──────────────▼───┐                            │
-│ Neo4j            │                            │
-│ Ontology graph   │                            │
-│ relationships    │                            │
-└──────────────┬───┘                            │
-               │                                │
-┌──────────────▼────────────────────────────────▼──────────────┐
-│                    Backend Domain Services                   │
-│ Ontology Service | Rule Engine | RAG Service | Agent Worker   │
-│ Org Routing Service | Notification Service | Approval Service │
-└──────────────┬───────────────────────────────────────────────┘
+│ pgvector         │   │ originals      │  │ tool-call JSON    │
+│ org/audit data   │   └────────────────┘  └──────────────────┘
+│ telemetry        │
+│ sensor_alerts    │   ┌────────────────┐  ┌──────────────────┐
+│ agent_runs/events│   │ TimescaleDB     │  │ MQTT / Simulator │
+└──────────────┬───┘   │ optional later  │  │ optional ingest   │
+               │       │ high-volume TS  │  │ Phase 07-10       │
+               │       └────────────────┘  └──────────────────┘
+               │ Ontology/SensorAlert sync từ domain services
+┌──────────────▼───┐
+│ Neo4j            │
+│ Ontology graph   │
+│ relationships    │
+│ Sensor state     │
+└──────────────┬───┘
                │
 ┌──────────────▼───────────────────────────────────────────────┐
 │                         n8n Webhook                          │
 │ Email | Slack/Teams/Zalo nội bộ | Ticket system | ERP bridge  │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+Ghi chú quan trọng:
+
+- LLM chỉ nằm ở lớp giao tiếp và tổng hợp phản hồi. Quyết định nghiệp vụ phải đi qua Rule Engine, Ontology, Domain Service và human approval.
+- PostgreSQL là source of record cho dữ liệu giao dịch, audit, org, purchase request và telemetry MVP. TimescaleDB chỉ là lựa chọn nâng cấp khi sensor readings tăng lớn.
+- Neo4j lưu quan hệ Ontology, quan hệ Asset/Component/Sensor/Rule/Alert và trạng thái tổng hợp; không lưu từng sensor reading dày đặc.
+- 3D Twin là view vận hành đọc từ telemetry, SensorAlert và ontology mapping. 3D không được hard-code trạng thái cảnh báo.
+- MQTT/simulator là nguồn ingest tùy phase. MVP có thể bắt đầu bằng `POST /api/telemetry/readings` và polling 3-5 giây.
 
 ## 5. Module hệ thống
 

@@ -17,6 +17,7 @@ const navItems = [
   { href: "/", label: "Tổng quan" },
   { href: "/operations", label: "Vận hành" },
   { href: "/assets", label: "Tài sản" },
+  { href: "/org", label: "Tổ chức" },
   { href: "/ontology", label: "Ontology" },
   { href: "/manuals", label: "Manual / RAG" },
   { href: "/workflows", label: "Task / Mua hàng" },
