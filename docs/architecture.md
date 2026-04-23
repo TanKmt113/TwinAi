@@ -1,18 +1,18 @@
 # Architecture
 
-Phase 4 có dashboard vận hành, Ontology map, upload/parse manual, Chat/RAG có citations và chat agent có tool context. Lớp Agentic AI phải được hiểu là workflow có guardrail, không phải một chatbot tự quyết định nghiệp vụ.
+Phase 4 có dashboard vận hành, Ontology map, upload/parse manual, Chat/RAG có citations và chat agent có tool context. Phase 07-10 mở rộng hệ thống thành Digital Twin realtime với sensor telemetry và mô phỏng 3D. Lớp Agentic AI phải được hiểu là workflow có guardrail, không phải một chatbot tự quyết định nghiệp vụ.
 
 ## Tổng quan hệ thống
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                         Next.js UI                          │
-│ Dashboard | Ontology Map | Chat | Task | Purchase | Admin    │
+│ Dashboard | Ontology Map | Chat | Task | Purchase | 3D Twin  │
 └──────────────────────────────┬──────────────────────────────┘
                                │ REST/JSON
 ┌──────────────────────────────▼──────────────────────────────┐
 │                         FastAPI API                         │
-│ Auth | Asset API | Manual API | Rule API | Chat API          │
+│ Auth | Asset API | Manual API | Rule API | Chat | Telemetry   │
 └──────────────────────────────┬──────────────────────────────┘
                                │ user request / scheduled job / data change
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -41,14 +41,15 @@ Phase 4 có dashboard vận hành, Ontology map, upload/parse manual, Chat/RAG c
 ┌──────────────────────────────▼──────────────────────────────┐
 │                    Backend Domain Services                  │
 │ Ontology Service | Rule Engine | RAG Service | Purchase API  │
-│ Approval Service | Audit Service | Notification Service      │
+│ Approval | Audit | Notification | Telemetry | Realtime Rules │
 └──────────────┬───────────────┬───────────────┬──────────────┘
                │               │               │
 ┌──────────────▼───┐   ┌───────▼────────┐  ┌───▼──────────────┐
 │ PostgreSQL       │   │ MinIO          │  │ OpenAI/Gemini API │
 │ business data    │   │ manual files   │  │ LLM + embedding   │
 │ pgvector         │   │ originals      │  │ tool-call JSON    │
-│ agent_runs       │   └────────────────┘  └──────────────────┘
+│ telemetry        │   └────────────────┘  └──────────────────┘
+│ agent_runs       │
 │ agent_events     │
 │ audit_logs       │
 └──────────────┬───┘
@@ -120,6 +121,21 @@ Response Agent
   -> LLM tổng hợp JSON: conclusion, evidence, recommended_actions, missing_data, citations
 ```
 
+## Digital Twin realtime workflow
+
+```text
+Sensor / Simulator / MQTT Gateway
+  -> POST /api/telemetry/readings hoặc MQTT topic
+  -> Telemetry Service validate sensor_code, metric, timestamp, quality
+  -> lưu SensorReading vào PostgreSQL hoặc TimescaleDB
+  -> Realtime Rule Engine kiểm tra threshold/window/min_samples
+  -> Sensor Alert Service tạo hoặc update SensorAlert
+  -> Ontology Sync Service upsert Sensor/SensorAlert vào Neo4j
+  -> Realtime API push/polling cho dashboard và 3D Twin
+  -> Action Agent tạo inspection task nếu rule cho phép
+  -> Chat Agent dùng telemetry evidence khi trả lời
+```
+
 ## Vai trò agent
 
 | Agent | Có dùng LLM? | Vai trò |
@@ -132,6 +148,8 @@ Response Agent
 | Action Agent | Không | Tạo task/purchase request draft theo rule được phép |
 | Approval Agent | Không | Xác định policy, approver và human gate |
 | Notification Agent | Không | Gửi n8n webhook và ghi trạng thái gửi |
+| Telemetry Agent | Không | Nhận sensor reading, chuẩn hóa metric và lưu time-series |
+| Realtime Rule Agent | Không | Chạy rule threshold/window từ sensor, tạo SensorAlert |
 
 ## Ranh giới quyết định
 
@@ -144,19 +162,23 @@ Response Agent
 
 ## Vai trò service
 
-- `frontend`: dashboard vận hành, nút chạy reasoning, bảng task/purchase request, Ontology map, manual upload và chat panel.
+- `frontend`: dashboard vận hành, nút chạy reasoning, bảng task/purchase request, Ontology map, manual upload, chat panel và 3D Twin.
 - `backend`: FastAPI API, domain service, agent workflow entrypoint.
-- `postgres`: dữ liệu giao dịch, audit, pgvector, agent runs/events.
-- `neo4j`: Ontology graph và quan hệ nghiệp vụ.
+- `postgres`: dữ liệu giao dịch, audit, pgvector, agent runs/events, sensor readings MVP.
+- `timescale`: lựa chọn nâng cấp cho sensor readings khi telemetry nhiều.
+- `neo4j`: Ontology graph, quan hệ nghiệp vụ, Sensor/SensorAlert relationship.
 - `minio`: lưu manual/file gốc.
 - `manual_chunks`: nội dung đã parse/chunk trong PostgreSQL để phục vụ RAG.
 - `llm_agent`: gọi Gemini/OpenAI khi có API key để tổng hợp JSON có guardrail.
 - `n8n`: automation/notification ra hệ thống ngoài.
+- `mqtt`: lựa chọn Phase 10 cho thiết bị thật hoặc simulator stream.
+- `threejs`: mô phỏng 3D Digital Twin trên frontend.
 
 ## Ranh giới dữ liệu
 
-- PostgreSQL là source of record cho dữ liệu giao dịch.
-- Neo4j là source of truth cho quan hệ Ontology.
+- PostgreSQL là source of record cho dữ liệu giao dịch và telemetry MVP.
+- Neo4j là source of truth cho quan hệ Ontology, không lưu từng sensor reading dày đặc.
 - MinIO lưu file gốc.
 - LLM chỉ nhận context đã được backend chuẩn bị từ tool/domain service.
 - API key model chỉ nằm ở backend, không đưa xuống frontend.
+- 3D Twin chỉ là view; trạng thái phải đến từ API telemetry/alert/ontology.

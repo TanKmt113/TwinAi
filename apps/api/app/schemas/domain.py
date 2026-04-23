@@ -62,6 +62,8 @@ class ManualRead(BaseModel):
     file_type: str | None
     version: str | None
     status: str
+    linked_rule_code: str | None = None
+    neo4j_sync: dict[str, Any] | None = None
 
     model_config = {"from_attributes": True}
 

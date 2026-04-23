@@ -17,24 +17,20 @@ services:
       timeout: 5s
       retries: 5
 
-  # neo4j:
-  #   image: neo4j:5-community
-  #   container_name: twinai-neo4j
-  #   environment:
-  #     NEO4J_AUTH: neo4j/twinai-neo4j-password
-  #     NEO4J_server_memory_heap_initial__size: 512m
-  #     NEO4J_server_memory_heap_max__size: 1G
-  #   ports:
-  #     - "7474:7474"
-  #     - "7687:7687"
-  #   volumes:
-  #     - neo4j_data:/data
-  #     - ./neo4j:/var/lib/neo4j/import:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "cypher-shell -u neo4j -p twinai-neo4j-password 'RETURN 1' || exit 1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 12
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: twinai-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: twinai-pgadmin-password
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   neo4j:
     image: neo4j:5-community
     container_name: twinai-neo4j
@@ -57,18 +53,6 @@ services:
       timeout: 5s
       retries: 12
 
-  # minio:
-  #   image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-  #   container_name: twinai-minio
-  #   command: server /data --console-address ":9001"
-  #   environment:
-  #     MINIO_ROOT_USER: twinai
-  #     MINIO_ROOT_PASSWORD: twinai-minio-password
-  #   ports:
-  #     - "9000:9000"
-  #     - "9001:9001"
-  #   volumes:
-  #     - minio_data:/data
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: twinai-minio
@@ -147,6 +131,7 @@ services:
 
 volumes:
   postgres_data:
+  pgadmin_data:
   neo4j_data:
   minio_data:
   n8n_data:

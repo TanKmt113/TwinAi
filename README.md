@@ -4,13 +4,15 @@ Codebase MVP cho hệ thống Agentic AI Ontology nội bộ.
 
 Phase hiện tại: **Phase 04 - Manual + RAG + Chat**.
 
+Roadmap mở rộng đã bổ sung **Phase 07-10** cho Digital Twin realtime sensor và mô phỏng 3D.
+
 ## Cấu trúc chính
 
 ```text
 apps/
   api/        FastAPI backend
   web/        Next.js frontend
-infra/        Docker Compose, PostgreSQL, Neo4j, MinIO, n8n
+infra/        Docker Compose, PostgreSQL, Neo4j, MinIO, n8n, pgAdmin
 docs/         Tài liệu kỹ thuật triển khai
 phase/        Kế hoạch phát triển theo phase
 ```
@@ -28,6 +30,7 @@ Sau khi chạy:
 - API: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 - Neo4j: `http://localhost:7474`
+- pgAdmin: `http://localhost:5050`
 - MinIO: `http://localhost:9001`
 - n8n: `http://localhost:5678`
 
@@ -100,3 +103,35 @@ Phase 2 đã thêm:
 ## Phase tiếp theo
 
 Phase 05 sẽ thêm approval UI, notification qua n8n và audit log viewer.
+
+## Digital Twin mở rộng
+
+Sau Phase 06, roadmap mới bổ sung:
+
+```text
+Phase 07: Realtime Sensor + Telemetry
+Phase 08: Realtime Rule Engine
+Phase 09: 3D Digital Twin
+Phase 10: Nghiệm thu Digital Twin
+```
+
+Mục tiêu mở rộng:
+
+- Nhận sensor reading cho thang máy/linh kiện.
+- Lưu latest/history telemetry.
+- Gắn Sensor/SensorAlert vào Neo4j ontology.
+- Chạy rule realtime như `R-ELV-VIB-001`.
+- Hiển thị 3D Digital Twin bằng Three.js.
+- Bind trạng thái 3D theo telemetry và alert.
+
+Luồng mục tiêu:
+
+```text
+Sensor reading
+  -> Telemetry API
+  -> Realtime Rule Engine
+  -> SensorAlert
+  -> Neo4j Ontology
+  -> 3D Twin đổi trạng thái
+  -> Chat trả lời có telemetry evidence
+```

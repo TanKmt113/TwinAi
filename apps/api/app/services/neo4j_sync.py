@@ -59,6 +59,20 @@ class Neo4jSyncService:
         except (Neo4jError, ServiceUnavailable, OSError) as exc:
             return {"enabled": True, "synced": False, "error": str(exc)}
 
+    def sync_manual_rule_link(self, manual: Manual, rule: Rule) -> dict[str, Any]:
+        if not self.is_enabled():
+            return {"enabled": False, "synced": False}
+
+        try:
+            with self._driver() as driver:
+                with driver.session() as session:
+                    self._ensure_constraints(session)
+                    session.execute_write(self._upsert_manual, manual)
+                    session.execute_write(self._upsert_rule, rule)
+            return {"enabled": True, "synced": True}
+        except (Neo4jError, ServiceUnavailable, OSError) as exc:
+            return {"enabled": True, "synced": False, "error": str(exc)}
+
     def get_asset_context(self, asset_code: str) -> dict[str, Any]:
         if not self.is_enabled():
             return {}
@@ -170,10 +184,27 @@ class Neo4jSyncService:
 
     @staticmethod
     def _upsert_rule(tx, rule: Rule) -> None:
+        if not rule.source_manual_id:
+            tx.run(
+                """
+                MERGE (r:Rule {code: $code})
+                SET r.id = $id, r.name = $name, r.domain = $domain, r.status = $status
+                """,
+                id=rule.id,
+                code=rule.code,
+                name=rule.name,
+                domain=rule.domain,
+                status=rule.status,
+            )
+            return
+
         tx.run(
             """
             MERGE (r:Rule {code: $code})
             SET r.id = $id, r.name = $name, r.domain = $domain, r.status = $status
+            WITH r
+            OPTIONAL MATCH (r)-[old:BASED_ON]->(:Manual)
+            DELETE old
             WITH r
             MATCH (m:Manual {id: $manual_id})
             MERGE (r)-[:BASED_ON]->(m)
@@ -253,4 +284,3 @@ def _node_data(value: Any) -> Any:
     if value is None:
         return None
     return dict(value)
-

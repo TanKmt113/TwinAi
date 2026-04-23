@@ -90,7 +90,9 @@ class ChatService:
             )
         )
         rule = self.db.scalar(select(Rule).where(Rule.code == "R-ELV-CABLE-001"))
-        manual = self.db.scalar(select(Manual).where(Manual.code == "MAN-ELV-001"))
+        manual = self.db.get(Manual, rule.source_manual_id) if rule and rule.source_manual_id else None
+        if not manual:
+            manual = self.db.scalar(select(Manual).where(Manual.code == "MAN-ELV-001"))
         chunks = self.rag.search_chunks(question)
         tasks = list(self.db.scalars(select(InspectionTask).where(InspectionTask.status == "open")))
         purchase_requests = list(

@@ -11,6 +11,10 @@ Thư mục này tách kế hoạch triển khai từ tài liệu `08-thiet-ke-he
 - `04-manual-rag-chat.md`: upload manual, parse/chunk, embedding, pgvector, chat có citations.
 - `05-approval-notification-audit.md`: phê duyệt purchase request, notification qua n8n và audit log viewer.
 - `06-nghiem-thu-mvp.md`: kịch bản nghiệm thu cuối cùng cho MVP.
+- `07-realtime-sensor-telemetry.md`: thêm sensor model, API ingest telemetry và dashboard realtime cơ bản.
+- `08-realtime-rule-engine.md`: thêm rule realtime từ sensor, sensor alert và đồng bộ sensor vào Neo4j.
+- `09-3d-digital-twin.md`: thêm mô phỏng 3D thang máy bằng Three.js và bind dữ liệu realtime.
+- `10-nghiem-thu-digital-twin.md`: nghiệm thu luồng Digital Twin mở rộng với sensor + 3D + ontology.
 
 ## Thứ tự triển khai
 
@@ -21,7 +25,12 @@ Phase 01
   -> Phase 04
   -> Phase 05
   -> Phase 06
+  -> Phase 07
+  -> Phase 08
+  -> Phase 09
+  -> Phase 10
 ```
 
 Phase 02 là lõi quan trọng nhất vì chứa dữ liệu, Neo4j Ontology graph và Rule Engine. Không nên build Chat/RAG trước khi Phase 02 chạy đúng.
 
+Phase 07-10 là phần mở rộng Digital Twin. Không nên build 3D trước khi có telemetry model và sensor API, vì 3D chỉ có giá trị vận hành khi được điều khiển bởi dữ liệu trạng thái thật hoặc giả lập có cấu trúc.

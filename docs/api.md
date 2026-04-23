@@ -55,6 +55,58 @@ POST /api/chat/query
 GET  /api/llm/health
 ```
 
+## Phase 07 Realtime Sensor + Telemetry
+
+```text
+GET  /api/sensors
+GET  /api/assets/{asset_id}/sensors
+POST /api/telemetry/readings
+POST /api/telemetry/readings/batch
+GET  /api/assets/{asset_id}/telemetry/latest
+GET  /api/assets/{asset_id}/telemetry/history?sensor_code={code}&from={iso}&to={iso}
+```
+
+Payload `POST /api/telemetry/readings`:
+
+```json
+{
+  "sensor_code": "SNS-CABLE-VIB-001",
+  "measured_at": "2026-04-23T10:30:00Z",
+  "value": 6.8,
+  "quality": "good",
+  "metadata": {
+    "source": "simulator"
+  }
+}
+```
+
+## Phase 08 Realtime Rule Engine
+
+```text
+GET  /api/sensor-alerts
+GET  /api/sensor-alerts/{alert_id}
+POST /api/sensor-alerts/{alert_id}/acknowledge
+POST /api/sensor-alerts/{alert_id}/resolve
+POST /api/realtime-rules/evaluate
+```
+
+## Phase 09 3D Digital Twin
+
+Frontend dùng các API hiện có và API telemetry:
+
+```text
+GET /api/assets/{asset_id}
+GET /api/assets/{asset_id}/ontology
+GET /api/assets/{asset_id}/telemetry/latest
+GET /api/sensor-alerts?asset_id={asset_id}&status=open
+```
+
+Realtime nâng cấp:
+
+```text
+GET /api/realtime/assets/{asset_id}/events
+```
+
 ## `GET /api/llm/health`
 
 Kiểm tra backend có gọi được Gemini API thật bằng `GEMINI_API_KEY` hay không.

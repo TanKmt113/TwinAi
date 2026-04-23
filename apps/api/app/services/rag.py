@@ -4,7 +4,8 @@ import re
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Manual, ManualChunk
+from app.models import Manual, ManualChunk, Rule
+from app.services.neo4j_sync import Neo4jSyncService
 
 
 DEFAULT_MANUAL_TEXT = """
@@ -32,6 +33,7 @@ class RagService:
         content: bytes,
         code: str | None = None,
         title: str | None = None,
+        rule_code: str | None = "R-ELV-CABLE-001",
     ) -> Manual:
         manual_code = code or self._code_from_file(file_name)
         manual = self.db.scalar(select(Manual).where(Manual.code == manual_code))
@@ -52,8 +54,30 @@ class RagService:
         text = self._decode_content(content)
         if text.strip():
             self.create_chunks(manual, text)
+        if rule_code:
+            self.link_manual_to_rule(manual, rule_code)
         self.db.commit()
         return manual
+
+    def link_manual_to_rule(self, manual: Manual, rule_code: str) -> dict:
+        rule = self.db.scalar(select(Rule).where(Rule.code == rule_code))
+        if not rule:
+            manual.linked_rule_code = None
+            manual.neo4j_sync = {"enabled": False, "synced": False, "reason": "rule_not_found"}
+            return {"linked": False, "reason": "rule_not_found", "rule_code": rule_code}
+
+        rule.source_manual_id = manual.id
+        self.db.flush()
+        sync_result = Neo4jSyncService().sync_manual_rule_link(manual, rule)
+        manual.linked_rule_code = rule.code
+        manual.neo4j_sync = sync_result
+        self.db.commit()
+        return {
+            "linked": True,
+            "rule_code": rule.code,
+            "manual_code": manual.code,
+            "neo4j_sync": sync_result,
+        }
 
     def parse_manual(self, manual: Manual) -> list[ManualChunk]:
         existing = self.list_chunks(manual.id)
@@ -138,4 +162,3 @@ def _chunk_text(text: str, max_chars: int = 700) -> list[str]:
 def _fake_embedding(text: str, dimensions: int = 8) -> list[float]:
     digest = hashlib.sha256(text.encode("utf-8")).digest()
     return [round(byte / 255, 4) for byte in digest[:dimensions]]
-
