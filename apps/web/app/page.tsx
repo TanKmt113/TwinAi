@@ -1,182 +1,67 @@
-import { ManualChatPanel } from "../components/manual-chat-panel";
-import { OntologyMap } from "../components/ontology-map";
-import { ReasoningControls } from "../components/reasoning-controls";
+import { AdminShell } from "../components/admin-shell";
+import { MetricCard } from "../components/metric-card";
 import { getDashboardData } from "../lib/api";
 
-export default async function Home() {
-  const { health, assets, tasks, purchaseRequests, agentRuns, manuals, selectedAsset, ontology } = await getDashboardData();
+export default async function OverviewPage() {
+  const { health, assets, tasks, purchaseRequests, agentRuns, manuals, selectedAsset } = await getDashboardData();
   const isOnline = health.status === "ok";
   const riskyAssets = assets.filter((asset) =>
     asset.components.some((component) => (component.remaining_lifetime_months ?? 999) <= 6),
   );
   const openTasks = tasks.filter((task) => task.status === "open");
   const draftPurchases = purchaseRequests.filter((request) => ["draft", "waiting_for_approval"].includes(request.status));
+  const latestRun = agentRuns[0];
 
   return (
-    <main className="page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Phase 03</p>
-          <h1>Dashboard Ontology thang máy</h1>
-        </div>
-        <span className={isOnline ? "status" : "status warning"}>
-          {isOnline ? "API đang chạy" : "API chưa sẵn sàng"}
-        </span>
-      </header>
-
-      <section className="metric-grid">
-        <Metric title="Tài sản" value={assets.length} detail="thang máy đang theo dõi" />
-        <Metric title="Rủi ro" value={riskyAssets.length} detail="asset có linh kiện <= 6 tháng" tone="danger" />
-        <Metric title="Task mở" value={openTasks.length} detail="task kiểm tra kỹ thuật" />
-        <Metric title="Mua hàng" value={draftPurchases.length} detail="purchase request draft/chờ duyệt" />
+    <AdminShell
+      eyebrow="Overview"
+      title="Tổng quan vận hành"
+      status={isOnline ? "API online" : "API offline"}
+      isOnline={isOnline}
+      tag="Phase 04+"
+    >
+      <section className="metric-grid" aria-label="KPI overview">
+        <MetricCard title="Tài sản" value={assets.length} detail="thang máy đang theo dõi" />
+        <MetricCard title="Rủi ro" value={riskyAssets.length} detail="asset có linh kiện <= 6 tháng" tone="danger" />
+        <MetricCard title="Task mở" value={openTasks.length} detail="task kiểm tra kỹ thuật" />
+        <MetricCard title="Mua hàng" value={draftPurchases.length} detail="draft/chờ duyệt" />
       </section>
 
-      <section className="dashboard-grid">
-        <article className="card span-2">
-          <div className="section-heading">
+      <section className="admin-grid two-one">
+        <article className="admin-section">
+          <div className="section-title-row">
             <div>
-              <p className="eyebrow">Agent controls</p>
-              <h2>Chạy Rule Engine</h2>
+              <p className="eyebrow">Asset snapshot</p>
+              <h2>{selectedAsset?.name ?? "Chưa có asset"}</h2>
             </div>
-            <span className="muted">Rule: R-ELV-CABLE-001</span>
+            <span className="module-tag">{selectedAsset?.code ?? "No asset"}</span>
           </div>
-          <ReasoningControls />
-        </article>
-
-        <article className="card">
-          <p className="eyebrow">Agent runs</p>
-          <h2>Lịch sử chạy</h2>
-          <div className="list-stack">
-            {agentRuns.slice(0, 5).map((run) => (
-              <div className="list-item" key={run.id}>
-                <strong>{run.run_type}</strong>
-                <span>{run.status}</span>
-              </div>
-            ))}
-            {!agentRuns.length ? <p className="empty-text">Chưa có agent run.</p> : null}
-          </div>
-        </article>
-      </section>
-
-      <section className="dashboard-grid">
-        <article className="card span-2">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Assets</p>
-              <h2>Danh sách thang máy</h2>
-            </div>
-            <span className="muted">{assets.length} tài sản</span>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mã tài sản</th>
-                  <th>Tên</th>
-                  <th>Vị trí</th>
-                  <th>Linh kiện</th>
-                  <th>Rủi ro</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assets.map((asset) => {
-                  const riskyComponents = asset.components.filter(
-                    (component) => (component.remaining_lifetime_months ?? 999) <= 6,
-                  );
-                  return (
-                    <tr key={asset.id}>
-                      <td><strong>{asset.code}</strong></td>
-                      <td>{asset.name}</td>
-                      <td>{asset.location ?? "-"}</td>
-                      <td>{asset.components.length}</td>
-                      <td>
-                        <span className={riskyComponents.length ? "badge danger" : "badge ok"}>
-                          {riskyComponents.length ? `${riskyComponents.length} rủi ro` : "Ổn định"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
-        <article className="card">
-          <p className="eyebrow">Asset detail</p>
-          <h2>{selectedAsset?.name ?? "Chưa có asset"}</h2>
           <div className="list-stack">
             {selectedAsset?.components.map((component) => (
               <div className="list-item" key={component.id}>
                 <strong>{component.name}</strong>
-                <span>{component.remaining_lifetime_months ?? "-"} tháng</span>
+                <span>{component.remaining_lifetime_months ?? "-"} tháng còn lại</span>
               </div>
             ))}
-          </div>
-        </article>
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Ontology map</p>
-            <h2>Chuỗi liên kết dữ liệu</h2>
-          </div>
-          <span className="muted">Asset → Component → Rule → Manual → Purchase → Approver</span>
-        </div>
-        <OntologyMap asset={selectedAsset} ontology={ontology} purchaseRequests={purchaseRequests} />
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Phase 04</p>
-            <h2>Manual + RAG + Chat</h2>
-          </div>
-          <span className="muted">Guardrail: chỉ trả lời khi có dữ liệu/rule/citation</span>
-        </div>
-        <ManualChatPanel manuals={manuals} />
-      </section>
-
-      <section className="dashboard-grid">
-        <article className="card">
-          <p className="eyebrow">Inspection tasks</p>
-          <h2>Task kiểm tra</h2>
-          <div className="list-stack">
-            {tasks.map((task) => (
-              <div className="list-item vertical" key={task.id}>
-                <strong>{task.title}</strong>
-                <span>{task.status} · {task.assigned_to ?? "chưa gán"}</span>
-              </div>
-            ))}
-            {!tasks.length ? <p className="empty-text">Chưa có task. Hãy chạy suy luận.</p> : null}
+            {!selectedAsset ? <p className="empty-text">Chưa có dữ liệu tài sản.</p> : null}
           </div>
         </article>
 
-        <article className="card span-2">
-          <p className="eyebrow">Purchase requests</p>
-          <h2>Đề xuất mua hàng</h2>
-          <div className="list-stack">
-            {purchaseRequests.map((request) => (
-              <div className="list-item vertical" key={request.id}>
-                <strong>{request.status} · Approver: {request.final_approver ?? "-"}</strong>
-                <span>{request.reason}</span>
-              </div>
-            ))}
-            {!purchaseRequests.length ? <p className="empty-text">Chưa có purchase request. Hãy chạy suy luận.</p> : null}
+        <article className="admin-section">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">System queues</p>
+              <h2>Hàng chờ xử lý</h2>
+            </div>
+            <span className="module-tag">{manuals.length} manual</span>
+          </div>
+          <div className="status-stack">
+            <div><strong>Agent run mới nhất</strong><span>{latestRun ? `${latestRun.run_type} · ${latestRun.status}` : "Chưa có"}</span></div>
+            <div><strong>Task mở</strong><span>{openTasks.length}</span></div>
+            <div><strong>Purchase draft/chờ duyệt</strong><span>{draftPurchases.length}</span></div>
           </div>
         </article>
       </section>
-    </main>
-  );
-}
-
-function Metric({ title, value, detail, tone }: { title: string; value: number; detail: string; tone?: "danger" }) {
-  return (
-    <article className="metric-card">
-      <p>{title}</p>
-      <strong className={tone === "danger" ? "danger-text" : undefined}>{value}</strong>
-      <span>{detail}</span>
-    </article>
+    </AdminShell>
   );
 }
