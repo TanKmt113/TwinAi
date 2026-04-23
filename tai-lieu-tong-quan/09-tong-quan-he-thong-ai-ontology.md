@@ -61,7 +61,7 @@ Diễn giải ngắn:
 
 ## 5. Hình minh họa hệ thống tổng thể
 
-![Sơ đồ tổng quan hệ thống AI Ontology](assets/ai-ontology-overview.svg)
+![Sơ đồ tổng quan hệ thống AI Ontology](https://github.com/TanKmt113/TwinAi/blob/main/tai-lieu-tong-quan/ChatGPT%20Image%2019_28_12%2023%20thg%204,%202026.png?raw=true)
 
 ## 6. Các tầng trong hệ thống
 
