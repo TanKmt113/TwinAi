@@ -123,6 +123,54 @@ export default async function PurchaseRequestDetailPage({ params }: PageProps) {
         {ruleTargets ? <JsonCard eyebrow="Rule" title="Notification targets theo rule" data={ruleTargets} /> : null}
       </section>
 
+      {contacts || ruleTargets ? (
+        <section className="admin-section">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Thông báo</p>
+              <h2>Ai được notify (tóm tắt MVP)</h2>
+            </div>
+          </div>
+          <ul className="list-stack">
+            {contacts?.primary_contact ? (
+              <li className="list-item vertical">
+                <strong>Primary (vận hành / hiện trường)</strong>
+                <span>
+                  {contacts.primary_contact.full_name} ({contacts.primary_contact.user_code})
+                  {contacts.primary_contact.email ? ` · ${contacts.primary_contact.email}` : ""}
+                </span>
+              </li>
+            ) : null}
+            {contacts?.backup_contact ? (
+              <li className="list-item vertical">
+                <strong>Backup / escalation đầu</strong>
+                <span>
+                  {contacts.backup_contact.full_name} ({contacts.backup_contact.user_code})
+                </span>
+              </li>
+            ) : null}
+            {ruleTargets?.suggested_approvers?.length ? (
+              <li className="list-item vertical">
+                <strong>Người phê duyệt gợi ý</strong>
+                <span>{ruleTargets.suggested_approvers.map((u) => `${u.full_name} (${u.user_code})`).join("; ")}</span>
+              </li>
+            ) : null}
+            {policyDetail?.config && typeof policyDetail.config === "object" && "escalate_to_roles" in policyDetail.config ? (
+              <li className="list-item vertical">
+                <strong>Vai trò escalate (policy)</strong>
+                <span>{JSON.stringify((policyDetail.config as { escalate_to_roles?: string[] }).escalate_to_roles ?? [])}</span>
+              </li>
+            ) : null}
+          </ul>
+          {contacts?.missing_notification_routing ? (
+            <p className="error-text">Cảnh báo: thiếu routing primary/backup — cần cấu hình org/contact cho asset.</p>
+          ) : null}
+          <p className="muted">
+            Sự kiện gửi n8n và audit <code>notification_sent</code> / <code>notification_failed</code> xem bảng Audit cho entity này.
+          </p>
+        </section>
+      ) : null}
+
       {policyDetail ? (
         <section className="admin-grid">
           <JsonCard eyebrow="Policy" title="Escalation policy (chi tiết)" data={policyDetail} />

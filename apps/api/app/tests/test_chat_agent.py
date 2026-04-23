@@ -9,6 +9,7 @@ os.environ["OPENAI_API_KEY"] = ""
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from app.core.config import get_settings
 from app.core.database import Base
 from app.models import AgentRun
 from app.models import domain  # noqa: F401
@@ -23,7 +24,10 @@ def _session():
     return TestingSession()
 
 
-def test_chat_agent_falls_back_when_llm_is_not_configured() -> None:
+def test_chat_agent_falls_back_when_llm_is_not_configured(monkeypatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    get_settings.cache_clear()
     with _session() as db:
         seed_phase_two_data(db)
 
@@ -32,6 +36,7 @@ def test_chat_agent_falls_back_when_llm_is_not_configured() -> None:
         assert response.intent == "asset_risk_query"
         assert response.agent_mode == "rule_fallback_no_llm_key"
         assert "get_asset_ontology" in response.tool_calls
+        assert "get_asset_notification_routing" in response.tool_calls
         assert "Cáp kéo Calidas 1" in response.conclusion
 
         runs = list(db.scalars(select(AgentRun)))
@@ -52,6 +57,7 @@ def test_chat_agent_uses_llm_payload_when_configured(monkeypatch) -> None:
             assert question
             assert intent == "asset_risk_query"
             assert "asset_risks" in tool_context
+            assert "asset_routing_contacts" in tool_context
             return {
                 "conclusion": "Agent đã kiểm tra ontology, rule và manual.",
                 "evidence": ["CMP-CABLE-001 còn 5 tháng tuổi thọ."],
@@ -84,7 +90,10 @@ def test_chat_agent_blocks_out_of_scope_questions() -> None:
         assert "Không đủ dữ liệu" in response.conclusion
 
 
-def test_chat_agent_counts_components_instead_of_falling_back_to_risk_query() -> None:
+def test_chat_agent_counts_components_instead_of_falling_back_to_risk_query(monkeypatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    get_settings.cache_clear()
     with _session() as db:
         seed_phase_two_data(db)
 

@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
 from app.models import Asset, Component, InspectionTask, InventoryItem, PurchaseRequest
 from app.services.n8n_webhook import post_n8n_workflow_event
 from app.services.repositories import ReasoningRepository
@@ -23,7 +22,9 @@ def notify_workflow_event(
 ) -> dict[str, Any]:
     """POST n8n rồi ghi audit; dùng SessionLocal để không phụ thuộc session caller đã commit."""
     result = post_n8n_workflow_event(event, payload)
-    with SessionLocal() as db:
+    from app.core import database as dbmod
+
+    with dbmod.SessionLocal() as db:
         repo = ReasoningRepository(db)
         if result.get("sent"):
             repo.add_audit(

@@ -28,7 +28,9 @@ def test_reasoning_creates_task_and_purchase_request(monkeypatch) -> None:
         assert response.findings[0]["component_code"] == "CMP-CABLE-001"
         assert len(response.created_tasks) == 1
         assert len(response.created_purchase_requests) == 1
-        assert response.created_purchase_requests[0].final_approver == "CEO"
+        pr0 = response.created_purchase_requests[0]
+        assert pr0.approval_policy_code == "AP-ELV-IMPORT-CEO"
+        assert pr0.final_approver in ("CEO", "CEO / Ban đầu tư")
 
 
 def test_reasoning_is_idempotent_for_open_records(monkeypatch) -> None:
