@@ -146,6 +146,8 @@ class PurchaseRequest(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft")
     approval_policy_code: Mapped[str | None] = mapped_column(String(80))
     final_approver: Mapped[str | None] = mapped_column(String(120))
+    first_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_approved_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_by_agent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -215,6 +217,7 @@ class OrgUser(Base):
     org_unit_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("org_units.id"), nullable=True)
     manager_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("org_users.id"), nullable=True)
     role_tags: Mapped[list[str]] = mapped_column(JSONType, nullable=False, default=list)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     org_unit: Mapped["OrgUnit | None"] = relationship("OrgUnit", back_populates="members")

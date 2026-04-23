@@ -51,6 +51,8 @@ class PurchaseRequestRead(BaseModel):
     status: str
     approval_policy_code: str | None
     final_approver: str | None
+    first_approved_at: datetime | None = None
+    first_approved_by: str | None = None
     created_by_agent: bool
     created_at: datetime
 
@@ -69,6 +71,37 @@ class WorkflowActorBody(BaseModel):
     actor_type: str = "user"
     actor_id: str = "demo_user"
     note: str | None = None
+
+
+class EscalationCheckBody(BaseModel):
+    """Kiểm tra SLA acknowledge → có cần escalate (demo theo policy)."""
+
+    asset_id: str | None = None
+    policy_code: str = "ELV-CABLE-ESCALATION-01"
+    opened_at: datetime
+    acknowledged_at: datetime | None = None
+    dry_run: bool = True
+
+
+class EscalationCheckResponse(BaseModel):
+    should_escalate: bool
+    reason: str
+    minutes_open: float
+    acknowledge_sla_minutes: int
+    suggested_escalation_contacts: list[dict[str, Any]] = Field(default_factory=list)
+    audit_recorded: bool = False
+
+
+class LoginRequest(BaseModel):
+    user_code: str = Field(min_length=2, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_code: str
+    roles: list[str] = Field(default_factory=list)
 
 
 class AuditLogRead(BaseModel):

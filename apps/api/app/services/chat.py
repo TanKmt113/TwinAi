@@ -10,6 +10,7 @@ from app.schemas import ChatResponse, Citation
 from app.services.llm_agent import LlmAgentClient, LlmAgentError
 from app.services.neo4j_sync import Neo4jSyncService
 from app.services.rag import RagService
+from app.services.routing_context import build_asset_contacts
 
 
 class ChatService:
@@ -167,6 +168,24 @@ class ChatService:
             ]
         )
 
+        asset_routing_contacts: list[dict[str, Any]] = []
+        seen_asset_ids: set[str] = set()
+        for component in risky_components:
+            if component.asset_id in seen_asset_ids:
+                continue
+            seen_asset_ids.add(component.asset_id)
+            asset_row = self.db.get(Asset, component.asset_id)
+            if asset_row:
+                asset_routing_contacts.append(build_asset_contacts(self.db, asset_row))
+        if requested_asset_code:
+            focus_asset = self.db.scalar(select(Asset).where(Asset.code == requested_asset_code))
+            if focus_asset and focus_asset.id not in seen_asset_ids:
+                asset_routing_contacts.append(build_asset_contacts(self.db, focus_asset))
+
+        routing_guardrails = {
+            "missing_notification_routing": any(row.get("missing_notification_routing") for row in asset_routing_contacts),
+        }
+
         return {
             "intent": intent,
             "requested_asset_code": requested_asset_code,
@@ -213,8 +232,10 @@ class ChatService:
                 for request in purchase_requests
             ],
             "approval_policy": self._approval_policy_from_requests(purchase_requests),
+            "asset_routing_contacts": asset_routing_contacts,
+            "routing_guardrails": routing_guardrails,
             "citations": citations,
-            "tool_calls": tool_calls,
+            "tool_calls": tool_calls + ["get_asset_notification_routing"],
         }
 
     def _build_rule_response(
@@ -269,6 +290,12 @@ class ChatService:
             missing_data = []
         if extra_missing_data:
             missing_data.extend(extra_missing_data)
+        if intent != "asset_component_count_query" and tool_context.get("routing_guardrails", {}).get(
+            "missing_notification_routing"
+        ):
+            missing_data.append(
+                "Thiếu cấu hình primary/backup contact (org routing) cho ít nhất một tài sản liên quan."
+            )
 
         recommended_actions = [
             "Kiểm tra task kỹ thuật đã tạo.",

@@ -86,6 +86,32 @@ def _setup_pr(db) -> str:
     return pr.id
 
 
+def test_single_approve_when_not_import(monkeypatch) -> None:
+    monkeypatch.delenv("PHASE5_WRITE_SECRET", raising=False)
+    get_settings.cache_clear()
+    engine = _sqlite_memory_engine()
+    TestingSession = sessionmaker(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    monkeypatch.setattr("app.services.notification_flow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
+    monkeypatch.setattr("app.services.purchase_workflow.Neo4jSyncService.sync_task_and_request", lambda self, **_: {})
+
+    with TestingSession() as db:
+        pr_id = _setup_pr(db)
+        inv = db.get(InventoryItem, db.get(PurchaseRequest, pr_id).inventory_item_id)
+        inv.import_required = False
+        db.commit()
+
+    from app.core import database as dbmod
+
+    monkeypatch.setattr(dbmod, "engine", engine)
+    monkeypatch.setattr(dbmod, "SessionLocal", TestingSession)
+    client = TestClient(app)
+    assert client.post(f"/api/purchase-requests/{pr_id}/submit", json={"actor_type": "user", "actor_id": "u1"}).status_code == 200
+    r = client.post(f"/api/purchase-requests/{pr_id}/approve", json={"actor_type": "user", "actor_id": "ops"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "approved"
+
+
 def test_purchase_submit_approve_reject(monkeypatch) -> None:
     monkeypatch.delenv("PHASE5_WRITE_SECRET", raising=False)
     get_settings.cache_clear()
@@ -99,7 +125,7 @@ def test_purchase_submit_approve_reject(monkeypatch) -> None:
         calls.append(event)
         return {"sent": True, "http_status": 200}
 
-    monkeypatch.setattr("app.services.purchase_workflow.post_n8n_workflow_event", fake_post)
+    monkeypatch.setattr("app.services.notification_flow.post_n8n_workflow_event", fake_post)
     monkeypatch.setattr("app.services.purchase_workflow.Neo4jSyncService.sync_task_and_request", lambda self, **_: {})
 
     with TestingSession() as db:
@@ -122,16 +148,26 @@ def test_purchase_submit_approve_reject(monkeypatch) -> None:
 
     r2 = client.post(
         f"/api/purchase-requests/{pr_id}/approve",
-        json={"actor_type": "user", "actor_id": "ceo", "note": "ok"},
+        json={"actor_type": "user", "actor_id": "tp_ops", "note": "cấp 1"},
     )
     assert r2.status_code == 200
-    assert r2.json()["status"] == "approved"
+    assert r2.json()["status"] == "waiting_for_approval"
+    assert r2.json()["first_approved_by"] == "tp_ops"
+    assert "purchase_request_level1_approved" in calls
+
+    r3 = client.post(
+        f"/api/purchase-requests/{pr_id}/approve",
+        json={"actor_type": "user", "actor_id": "ceo", "note": "ok"},
+    )
+    assert r3.status_code == 200
+    assert r3.json()["status"] == "approved"
     assert "purchase_request_approved" in calls
 
     logs = client.get("/api/audit-logs", params={"entity_type": "purchase_request", "entity_id": pr_id})
     assert logs.status_code == 200
     actions = {item["action"] for item in logs.json()}
     assert "user_submitted_purchase_request" in actions
+    assert "user_approved_purchase_request_level1" in actions
     assert "user_approved_purchase_request" in actions
 
 
@@ -142,7 +178,7 @@ def test_purchase_reject_flow(monkeypatch) -> None:
     TestingSession = sessionmaker(bind=engine)
     Base.metadata.create_all(bind=engine)
 
-    monkeypatch.setattr("app.services.purchase_workflow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
+    monkeypatch.setattr("app.services.notification_flow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
     monkeypatch.setattr("app.services.purchase_workflow.Neo4jSyncService.sync_task_and_request", lambda self, **_: {})
 
     with TestingSession() as db:
@@ -192,7 +228,7 @@ def test_purchase_cancel_draft(monkeypatch) -> None:
     engine = _sqlite_memory_engine()
     TestingSession = sessionmaker(bind=engine)
     Base.metadata.create_all(bind=engine)
-    monkeypatch.setattr("app.services.purchase_workflow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
+    monkeypatch.setattr("app.services.notification_flow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
     monkeypatch.setattr("app.services.purchase_workflow.Neo4jSyncService.sync_task_and_request", lambda self, **_: {})
     with TestingSession() as db:
         pr_id = _setup_pr(db)
@@ -210,7 +246,7 @@ def test_phase5_write_secret_enforced(monkeypatch) -> None:
     engine = _sqlite_memory_engine()
     TestingSession = sessionmaker(bind=engine)
     Base.metadata.create_all(bind=engine)
-    monkeypatch.setattr("app.services.purchase_workflow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
+    monkeypatch.setattr("app.services.notification_flow.post_n8n_workflow_event", lambda *a, **k: {"sent": True})
     monkeypatch.setattr("app.services.purchase_workflow.Neo4jSyncService.sync_task_and_request", lambda self, **_: {})
     with TestingSession() as db:
         pr_id = _setup_pr(db)

@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = Field(default="gemini-embedding-001", alias="GEMINI_EMBEDDING_MODEL")
     n8n_webhook_url: str = Field(default="", alias="N8N_WEBHOOK_URL")
     phase5_write_secret: str = Field(default="", alias="PHASE5_WRITE_SECRET")
+    auth_enabled: bool = Field(default=False, alias="AUTH_ENABLED")
+    jwt_secret: str = Field(default="", alias="JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_expire_hours: int = Field(default=24, alias="JWT_EXPIRE_HOURS")
 
     @property
     def cors_origins(self) -> list[str]:

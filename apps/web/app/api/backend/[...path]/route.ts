@@ -73,6 +73,10 @@ function buildHeaders(request: NextRequest, targetPath: string) {
   if (contentType) {
     headers.set("content-type", contentType);
   }
+  const authorization = request.headers.get("authorization");
+  if (authorization) {
+    headers.set("authorization", authorization);
+  }
   const phase5 = process.env.PHASE5_WRITE_SECRET?.trim();
   if (phase5 && shouldAttachPhase5WriteSecret(request.method, targetPath)) {
     headers.set("X-Phase5-Write-Secret", phase5);

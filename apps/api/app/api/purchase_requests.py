@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_phase5_write_secret
+from app.api.deps import get_jwt_role_tags_if_present, require_phase5_write_access
 from app.core.database import get_db
 from app.models import Asset, Component, PurchaseRequest
 from app.schemas import PurchaseRequestDetailRead, PurchaseRequestRead, WorkflowActorBody
@@ -42,7 +42,7 @@ def get_purchase_request(request_id: str, db: Session = Depends(get_db)) -> Purc
     return _to_detail_read(db, row)
 
 
-@router.post("/{request_id}/submit", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_secret)])
+@router.post("/{request_id}/submit", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_access)])
 def submit_request(request_id: str, body: WorkflowActorBody, db: Session = Depends(get_db)) -> PurchaseRequest:
     try:
         return submit_purchase_request(
@@ -56,8 +56,13 @@ def submit_request(request_id: str, body: WorkflowActorBody, db: Session = Depen
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/{request_id}/approve", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_secret)])
-def approve_request(request_id: str, body: WorkflowActorBody, db: Session = Depends(get_db)) -> PurchaseRequest:
+@router.post("/{request_id}/approve", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_access)])
+def approve_request(
+    request_id: str,
+    body: WorkflowActorBody,
+    db: Session = Depends(get_db),
+    jwt_roles: list[str] | None = Depends(get_jwt_role_tags_if_present),
+) -> PurchaseRequest:
     try:
         return approve_purchase_request(
             db,
@@ -65,12 +70,15 @@ def approve_request(request_id: str, body: WorkflowActorBody, db: Session = Depe
             actor_type=body.actor_type,
             actor_id=body.actor_id,
             note=body.note,
+            jwt_role_tags=jwt_roles,
         )
     except PurchaseWorkflowError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        detail = str(exc)
+        code = 403 if detail == "approve_forbidden_role" else 400
+        raise HTTPException(status_code=code, detail=detail) from exc
 
 
-@router.post("/{request_id}/reject", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_secret)])
+@router.post("/{request_id}/reject", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_access)])
 def reject_request(request_id: str, body: WorkflowActorBody, db: Session = Depends(get_db)) -> PurchaseRequest:
     try:
         return reject_purchase_request(
@@ -84,7 +92,7 @@ def reject_request(request_id: str, body: WorkflowActorBody, db: Session = Depen
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/{request_id}/cancel", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_secret)])
+@router.post("/{request_id}/cancel", response_model=PurchaseRequestRead, dependencies=[Depends(require_phase5_write_access)])
 def cancel_request(request_id: str, body: WorkflowActorBody, db: Session = Depends(get_db)) -> PurchaseRequest:
     try:
         return cancel_purchase_request(

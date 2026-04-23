@@ -3,10 +3,16 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import AgentRun, Component, InspectionTask, InventoryItem, PurchaseRequest, Rule
+from app.models import AgentRun, Asset, Component, InspectionTask, InventoryItem, PurchaseRequest, Rule
 from app.schemas import InspectionTaskRead, PurchaseRequestRead, ReasoningRunResponse
 from app.services.neo4j_sync import Neo4jSyncService
+from app.services.notification_flow import (
+    build_inspection_task_payload,
+    build_purchase_request_draft_payload,
+    dispatch_pending_notifications,
+)
 from app.services.repositories import ReasoningRepository
+from app.services.routing_context import build_asset_contacts
 
 
 class ReasoningEngine:
@@ -21,6 +27,7 @@ class ReasoningEngine:
         created_tasks: list[InspectionTask] = []
         created_purchase_requests: list[PurchaseRequest] = []
         audit_events: list[dict[str, Any]] = []
+        pending_notifications: list[tuple[str, dict[str, Any], str, str]] = []
 
         try:
             for component in self.repo.list_active_components():
@@ -31,13 +38,15 @@ class ReasoningEngine:
                     finding = self._build_finding(component, rule)
                     findings.append(finding)
 
-                    task = self._ensure_task(component, rule, audit_events)
+                    task = self._ensure_task(component, rule, audit_events, pending_notifications)
                     if task and task not in created_tasks:
                         created_tasks.append(task)
 
                     inventory_item = self.repo.get_inventory_by_spare_part_code(component.spare_part_code)
                     if inventory_item and self._needs_purchase(component, inventory_item):
-                        request = self._ensure_purchase_request(component, inventory_item, rule, audit_events)
+                        request = self._ensure_purchase_request(
+                            component, inventory_item, rule, audit_events, pending_notifications
+                        )
                         if request and request not in created_purchase_requests:
                             created_purchase_requests.append(request)
 
@@ -49,6 +58,7 @@ class ReasoningEngine:
                 "created_purchase_requests_count": len(created_purchase_requests),
             }
             self.db.commit()
+            dispatch_pending_notifications(pending_notifications)
 
             return ReasoningRunResponse(
                 run_id=run.id,
@@ -88,13 +98,30 @@ class ReasoningEngine:
             "actions": rule.action_json,
         }
 
-    def _ensure_task(self, component: Component, rule: Rule, audit_events: list[dict[str, Any]]) -> InspectionTask | None:
+    def _ensure_task(
+        self,
+        component: Component,
+        rule: Rule,
+        audit_events: list[dict[str, Any]],
+        pending_notifications: list[tuple[str, dict[str, Any], str, str]],
+    ) -> InspectionTask | None:
         existing = self.repo.get_open_task(component.id, rule.id)
         if existing:
             return existing
 
         task = self.repo.create_task(component, rule)
         sync_result = self.neo4j.sync_task_and_request(task=task)
+        asset = self.db.get(Asset, component.asset_id)
+        if asset:
+            contacts = build_asset_contacts(self.db, asset)
+            if contacts.get("missing_notification_routing"):
+                self.repo.add_audit(
+                    action="missing_notification_routing",
+                    entity_type="inspection_task",
+                    entity_id=task.id,
+                    reason="Không resolve được primary/backup contact cho asset — kiểm tra org routing.",
+                    after={"asset_code": asset.code, "contact_resolution": contacts.get("contact_resolution")},
+                )
         audit = self.repo.add_audit(
             action="agent_created_inspection_task",
             entity_type="inspection_task",
@@ -103,6 +130,14 @@ class ReasoningEngine:
             after={"task_id": task.id, "neo4j_sync": sync_result},
         )
         audit_events.append({"action": audit.action, "entity_type": audit.entity_type, "entity_id": audit.entity_id})
+        pending_notifications.append(
+            (
+                "inspection_task_created",
+                build_inspection_task_payload(self.db, task),
+                "inspection_task",
+                task.id,
+            )
+        )
         return task
 
     def _needs_purchase(self, component: Component, inventory_item: InventoryItem) -> bool:
@@ -116,6 +151,7 @@ class ReasoningEngine:
         inventory_item: InventoryItem,
         rule: Rule,
         audit_events: list[dict[str, Any]],
+        pending_notifications: list[tuple[str, dict[str, Any], str, str]],
     ) -> PurchaseRequest | None:
         existing = self.repo.get_open_purchase_request(component.id, inventory_item.id)
         if existing:
@@ -123,6 +159,17 @@ class ReasoningEngine:
 
         request = self.repo.create_purchase_request(component, inventory_item, rule)
         sync_result = self.neo4j.sync_task_and_request(request=request)
+        asset = self.db.get(Asset, component.asset_id)
+        if asset:
+            contacts = build_asset_contacts(self.db, asset)
+            if contacts.get("missing_notification_routing"):
+                self.repo.add_audit(
+                    action="missing_notification_routing",
+                    entity_type="purchase_request",
+                    entity_id=request.id,
+                    reason="Không resolve được primary/backup contact cho asset — kiểm tra org routing.",
+                    after={"asset_code": asset.code, "contact_resolution": contacts.get("contact_resolution")},
+                )
         audit = self.repo.add_audit(
             action="agent_created_purchase_request",
             entity_type="purchase_request",
@@ -131,5 +178,13 @@ class ReasoningEngine:
             after={"purchase_request_id": request.id, "neo4j_sync": sync_result},
         )
         audit_events.append({"action": audit.action, "entity_type": audit.entity_type, "entity_id": audit.entity_id})
+        pending_notifications.append(
+            (
+                "purchase_request_drafted",
+                build_purchase_request_draft_payload(self.db, request),
+                "purchase_request",
+                request.id,
+            )
+        )
         return request
 

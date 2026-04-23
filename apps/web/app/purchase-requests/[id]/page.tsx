@@ -85,6 +85,15 @@ export default async function PurchaseRequestDetailPage({ params }: PageProps) {
                 {detail.quantity_requested} · {detail.approval_policy_code ?? "—"} · {detail.final_approver ?? "—"}
               </span>
             </div>
+            {detail.first_approved_by ? (
+              <div className="list-item vertical">
+                <strong>Phê duyệt cấp 1</strong>
+                <span>
+                  {detail.first_approved_by}
+                  {detail.first_approved_at ? ` · ${detail.first_approved_at}` : ""}
+                </span>
+              </div>
+            ) : null}
             <div className="list-item vertical">
               <strong>Component · Inventory · Rule</strong>
               <span>

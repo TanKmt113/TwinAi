@@ -1,5 +1,6 @@
 from datetime import date
 
+from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,8 @@ from app.models import (
     PurchaseRequest,
     Rule,
 )
+
+_demo_password_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def seed_phase_two_data(db: Session) -> None:
@@ -464,6 +467,7 @@ def _seed_org_users(db: Session) -> None:
                 org_unit_id=unit.id if unit else None,
                 manager_user_id=manager.id if manager else None,
                 role_tags=tags,
+                password_hash=_demo_password_ctx.hash("demo"),
                 is_active=True,
             )
         )

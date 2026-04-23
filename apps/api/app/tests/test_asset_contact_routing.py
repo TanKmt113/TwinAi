@@ -70,9 +70,11 @@ def test_build_asset_contacts_prefers_per_asset_assignment() -> None:
     assert ctx_mall["primary_contact"]["user_code"] == "USR-LEAD-MALL-001"
     assert ctx_mall["backup_contact"]["user_code"] == "USR-TP-OPS-001"
     assert ctx_mall["contact_resolution"]["primary_source"] == "asset_assignment"
+    assert ctx_mall["missing_notification_routing"] is False
 
     assert ctx_other["primary_contact"]["user_code"] == "USR-KTV-001"
     assert ctx_other["backup_contact"]["user_code"] == "USR-GD-HN-001"
+    assert ctx_other["missing_notification_routing"] is False
 
 
 def test_seed_asset_assignments_idempotent() -> None:

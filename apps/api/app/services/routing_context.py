@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -63,6 +64,7 @@ def build_asset_contacts(db: Session, asset: Asset) -> dict[str, Any]:
         backup_source = "role_fallback" if backup else "none"
 
     policy = db.scalar(select(EscalationPolicy).where(EscalationPolicy.code == "ELV-CABLE-ESCALATION-01"))
+    missing_notification_routing = primary_source == "none" or backup_source == "none"
 
     return {
         "asset_id": asset.id,
@@ -77,6 +79,7 @@ def build_asset_contacts(db: Session, asset: Asset) -> dict[str, Any]:
             "primary_source": primary_source,
             "backup_source": backup_source,
         },
+        "missing_notification_routing": missing_notification_routing,
     }
 
 
@@ -116,3 +119,42 @@ def get_escalation_policy_by_id_or_code(db: Session, policy_id: str) -> Escalati
     if row:
         return row
     return db.scalar(select(EscalationPolicy).where(EscalationPolicy.code == policy_id))
+
+
+def evaluate_escalation_due(
+    db: Session,
+    policy: EscalationPolicy,
+    *,
+    opened_at: datetime,
+    acknowledged_at: datetime | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """So sánh thời điểm mở alert/task với acknowledge_minutes trong policy (SLA MVP)."""
+    now = now or datetime.now(UTC)
+    opened_at = opened_at if opened_at.tzinfo else opened_at.replace(tzinfo=UTC)
+    if acknowledged_at is not None:
+        acknowledged_at = acknowledged_at if acknowledged_at.tzinfo else acknowledged_at.replace(tzinfo=UTC)
+
+    cfg = policy.config_json or {}
+    ack_min = int(cfg.get("acknowledge_minutes", 30))
+
+    if acknowledged_at is not None:
+        return {
+            "should_escalate": False,
+            "reason": "already_acknowledged",
+            "minutes_open": round((acknowledged_at - opened_at).total_seconds() / 60, 2),
+            "acknowledge_sla_minutes": ack_min,
+            "suggested_escalation_contacts": [],
+        }
+
+    minutes_open = max(0.0, (now - opened_at).total_seconds() / 60)
+    should = minutes_open >= ack_min
+    esc_roles = {str(r) for r in (cfg.get("escalate_to_roles") or ["branch_head", "executive"])}
+    escalate_users = _active_users_with_any_role(db, esc_roles)
+    return {
+        "should_escalate": should,
+        "reason": "sla_exceeded" if should else "within_sla",
+        "minutes_open": round(minutes_open, 2),
+        "acknowledge_sla_minutes": ack_min,
+        "suggested_escalation_contacts": [_user_brief(u) for u in escalate_users],
+    }

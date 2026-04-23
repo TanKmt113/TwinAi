@@ -3,10 +3,11 @@ from typing import Any
 
 from neo4j import GraphDatabase
 from neo4j.exceptions import Neo4jError, ServiceUnavailable
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Asset, Component, InspectionTask, InventoryItem, Manual, PurchaseRequest, Rule
+from app.models import Asset, Component, InspectionTask, InventoryItem, Manual, OrgUnit, OrgUser, PurchaseRequest, Rule
 
 
 class Neo4jSyncService:
@@ -36,6 +37,13 @@ class Neo4jSyncService:
                         session.execute_write(self._upsert_component, component)
                     for request in db.query(PurchaseRequest).all():
                         session.execute_write(self._upsert_purchase_request, request)
+                    for unit in db.scalars(select(OrgUnit).order_by(OrgUnit.sort_order)):
+                        session.execute_write(self._upsert_org_unit_node, unit)
+                    for unit in db.query(OrgUnit).all():
+                        if unit.parent_id:
+                            session.execute_write(self._link_org_unit_parent, unit.id, unit.parent_id)
+                    for org_user in db.query(OrgUser).all():
+                        session.execute_write(self._upsert_org_user_node, org_user)
             return {"enabled": True, "synced": True}
         except (Neo4jError, ServiceUnavailable, OSError) as exc:
             return {"enabled": True, "synced": False, "error": str(exc)}
@@ -115,6 +123,8 @@ class Neo4jSyncService:
             "CREATE CONSTRAINT manual_code IF NOT EXISTS FOR (n:Manual) REQUIRE n.code IS UNIQUE",
             "CREATE CONSTRAINT inventory_code IF NOT EXISTS FOR (n:InventoryItem) REQUIRE n.code IS UNIQUE",
             "CREATE CONSTRAINT purchase_request_id IF NOT EXISTS FOR (n:PurchaseRequest) REQUIRE n.id IS UNIQUE",
+            "CREATE CONSTRAINT org_unit_id IF NOT EXISTS FOR (n:OrgUnit) REQUIRE n.id IS UNIQUE",
+            "CREATE CONSTRAINT org_user_id IF NOT EXISTS FOR (n:OrgUser) REQUIRE n.id IS UNIQUE",
         ]
         for constraint in constraints:
             with suppress(Neo4jError):
@@ -275,6 +285,64 @@ class Neo4jSyncService:
             status=request.status,
             approval_policy_code=request.approval_policy_code or "UNKNOWN",
             final_approver=request.final_approver or "UNKNOWN",
+        )
+
+    @staticmethod
+    def _upsert_org_unit_node(tx, unit: OrgUnit) -> None:
+        tx.run(
+            """
+            MERGE (ou:OrgUnit {id: $id})
+            SET ou.code = $code, ou.name = $name, ou.level_kind = $level_kind, ou.sort_order = $sort_order
+            """,
+            id=unit.id,
+            code=unit.code,
+            name=unit.name,
+            level_kind=unit.level_kind,
+            sort_order=unit.sort_order,
+        )
+
+    @staticmethod
+    def _link_org_unit_parent(tx, child_id: str, parent_id: str) -> None:
+        tx.run(
+            """
+            MATCH (c:OrgUnit {id: $child_id})
+            MATCH (p:OrgUnit {id: $parent_id})
+            MERGE (c)-[:REPORTS_TO]->(p)
+            """,
+            child_id=child_id,
+            parent_id=parent_id,
+        )
+
+    @staticmethod
+    def _upsert_org_user_node(tx, user: OrgUser) -> None:
+        tx.run(
+            """
+            MERGE (u:OrgUser {id: $id})
+            SET u.user_code = $user_code, u.full_name = $full_name, u.email = $email,
+                u.job_title = $job_title, u.role_tags = $role_tags
+            WITH u
+            OPTIONAL MATCH (u)-[old_b:BELONGS_TO]->(:OrgUnit)
+            DELETE old_b
+            WITH u
+            OPTIONAL MATCH (ou:OrgUnit {id: $org_unit_id})
+            WHERE $org_unit_id IS NOT NULL
+            MERGE (u)-[:BELONGS_TO]->(ou)
+            WITH u
+            OPTIONAL MATCH (u)-[old_r:REPORTS_TO]->(:OrgUser)
+            DELETE old_r
+            WITH u
+            OPTIONAL MATCH (m:OrgUser {id: $manager_id})
+            WHERE $manager_id IS NOT NULL
+            MERGE (u)-[:REPORTS_TO]->(m)
+            """,
+            id=user.id,
+            user_code=user.user_code,
+            full_name=user.full_name,
+            email=user.email or "",
+            job_title=user.job_title or "",
+            role_tags=user.role_tags or [],
+            org_unit_id=user.org_unit_id,
+            manager_id=user.manager_user_id,
         )
 
 

@@ -63,6 +63,8 @@ export type PurchaseRequest = {
   status: string;
   approval_policy_code: string | null;
   final_approver: string | null;
+  first_approved_at?: string | null;
+  first_approved_by?: string | null;
   created_by_agent: boolean;
   created_at: string;
 };
@@ -131,6 +133,7 @@ export type AssetContacts = {
     primary_source: string;
     backup_source: string;
   };
+  missing_notification_routing?: boolean;
 };
 
 export type RuleNotificationTargets = {
@@ -154,6 +157,26 @@ export type WorkflowActorBody = {
   actor_id?: string;
   note?: string | null;
 };
+
+export type LoginResponse = {
+  access_token: string;
+  token_type: string;
+  user_code: string;
+  roles: string[];
+};
+
+export async function loginFromBrowser(userCode: string, password: string): Promise<LoginResponse> {
+  const response = await fetch("/api/backend/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ user_code: userCode, password }),
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Đăng nhập thất bại (${response.status}): ${t}`);
+  }
+  return response.json();
+}
 
 export type AgentRun = {
   id: string;
@@ -338,6 +361,17 @@ export async function queryChatFromBrowser(question: string): Promise<ChatRespon
   return response.json();
 }
 
+function browserAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  const token = window.localStorage.getItem("twinai_access_token");
+  if (!token) {
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function postPurchaseWorkflowAction(
   requestId: string,
   action: "submit" | "approve" | "reject" | "cancel",
@@ -345,7 +379,7 @@ async function postPurchaseWorkflowAction(
 ): Promise<PurchaseRequest> {
   const response = await fetch(`/api/backend/api/purchase-requests/${requestId}/${action}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...browserAuthHeaders() },
     body: JSON.stringify({
       actor_type: body.actor_type ?? "user",
       actor_id: body.actor_id ?? "demo_user",

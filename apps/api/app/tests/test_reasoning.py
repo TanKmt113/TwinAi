@@ -13,7 +13,8 @@ from app.services.reasoning import ReasoningEngine
 from app.services.seed import seed_phase_two_data
 
 
-def test_reasoning_creates_task_and_purchase_request() -> None:
+def test_reasoning_creates_task_and_purchase_request(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.reasoning.dispatch_pending_notifications", lambda *_a, **_k: None)
     engine = create_engine("sqlite+pysqlite:///:memory:")
     TestingSession = sessionmaker(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -30,7 +31,8 @@ def test_reasoning_creates_task_and_purchase_request() -> None:
         assert response.created_purchase_requests[0].final_approver == "CEO"
 
 
-def test_reasoning_is_idempotent_for_open_records() -> None:
+def test_reasoning_is_idempotent_for_open_records(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.reasoning.dispatch_pending_notifications", lambda *_a, **_k: None)
     engine = create_engine("sqlite+pysqlite:///:memory:")
     TestingSession = sessionmaker(bind=engine)
     Base.metadata.create_all(bind=engine)
