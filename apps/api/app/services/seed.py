@@ -1,7 +1,7 @@
 from datetime import date
 
 import bcrypt
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -19,6 +19,17 @@ from app.models import (
     Rule,
 )
 
+
+def backfill_null_org_user_passwords(db: Session) -> int:
+    """Gán bcrypt('demo') cho mọi org_users.password_hash đang NULL (DB cũ / thiếu seed)."""
+    rows = list(
+        db.scalars(select(OrgUser).where(or_(OrgUser.password_hash.is_(None), OrgUser.password_hash == ""))),
+    )
+    for user in rows:
+        user.password_hash = bcrypt.hashpw(b"demo", bcrypt.gensalt()).decode("utf-8")
+    return len(rows)
+
+
 def seed_phase_two_data(db: Session) -> None:
     """Idempotent seed: MVP assets + optional fake org / ops rows for UI & chat."""
     manual = _get_or_create_manual(db)
@@ -33,6 +44,7 @@ def seed_phase_two_data(db: Session) -> None:
     _seed_org_units(db)
     _seed_org_users(db)
     _seed_asset_contact_assignments(db)
+    backfill_null_org_user_passwords(db)
     db.commit()
 
 
@@ -394,6 +406,8 @@ def _seed_org_units(db: Session) -> None:
 
 def _seed_org_users(db: Session) -> None:
     """Người dùng gắn đơn vị + cấp trên trực tiếp (thứ tự tạo theo cây quản lý)."""
+    # Một hash cho mật khẩu demo; bổ sung cho user cũ (trước khi có cột password_hash).
+    demo_password_hash = bcrypt.hashpw(b"demo", bcrypt.gensalt()).decode("utf-8")
     rows: list[tuple[str, str, str, str, str, str | None, list[str]]] = [
         (
             "USR-CEO-001",
@@ -451,7 +465,11 @@ def _seed_org_users(db: Session) -> None:
         ),
     ]
     for ucode, fname, email, title, ou_code, mgr_code, tags in rows:
-        if db.scalar(select(OrgUser).where(OrgUser.user_code == ucode)):
+        existing = db.scalar(select(OrgUser).where(OrgUser.user_code == ucode))
+        if existing:
+            if not existing.password_hash:
+                existing.password_hash = demo_password_hash
+                db.flush()
             continue
         unit = db.scalar(select(OrgUnit).where(OrgUnit.code == ou_code))
         manager = db.scalar(select(OrgUser).where(OrgUser.user_code == mgr_code)) if mgr_code else None
@@ -464,7 +482,7 @@ def _seed_org_users(db: Session) -> None:
                 org_unit_id=unit.id if unit else None,
                 manager_user_id=manager.id if manager else None,
                 role_tags=tags,
-                password_hash=bcrypt.hashpw(b"demo", bcrypt.gensalt()).decode("utf-8"),
+                password_hash=demo_password_hash,
                 is_active=True,
             )
         )

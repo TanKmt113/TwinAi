@@ -1,12 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, type FormEvent, useMemo, useState } from "react";
 import { loginFromBrowser } from "../../lib/api";
 
-export default function LoginPage() {
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+    return "/workflows";
+  }
+  return raw;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const afterLoginPath = useMemo(() => safeNextPath(searchParams.get("next")), [searchParams]);
   const [userCode, setUserCode] = useState("USR-TP-OPS-001");
   const [password, setPassword] = useState("demo");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +28,7 @@ export default function LoginPage() {
     try {
       const res = await loginFromBrowser(userCode.trim(), password);
       window.localStorage.setItem("twinai_access_token", res.access_token);
-      router.push("/workflows");
+      router.push(afterLoginPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi đăng nhập.");
     } finally {
@@ -58,5 +67,19 @@ export default function LoginPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="admin-shell-root" style={{ padding: "2rem", textAlign: "center" }}>
+          <p>Đang tải…</p>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

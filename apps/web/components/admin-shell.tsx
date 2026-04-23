@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 type AdminShellProps = {
   title: string;
@@ -24,8 +24,20 @@ const navItems = [
   { href: "/audit-logs", label: "Audit log" },
 ];
 
+const AUTH_TOKEN_KEY = "twinai_access_token";
+
 export function AdminShell({ title, eyebrow, status, isOnline, tag, children }: AdminShellProps) {
   const pathname = usePathname();
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    setHasSession(Boolean(typeof window !== "undefined" && window.localStorage.getItem(AUTH_TOKEN_KEY)));
+  }, [pathname]);
+
+  function logout() {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setHasSession(false);
+  }
 
   return (
     <div className="admin-shell">
@@ -40,6 +52,17 @@ export function AdminShell({ title, eyebrow, status, isOnline, tag, children }: 
               {item.label}
             </Link>
           ))}
+          <div className="admin-nav-auth" style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border, #333)" }}>
+            {hasSession ? (
+              <button type="button" className="secondary-button" style={{ width: "100%" }} onClick={logout}>
+                Đăng xuất (JWT)
+              </button>
+            ) : (
+              <Link className={pathname === "/login" ? "active" : undefined} href="/login">
+                Đăng nhập
+              </Link>
+            )}
+          </div>
         </nav>
         <div className="phase-panel">
           <span>Roadmap</span>

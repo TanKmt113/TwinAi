@@ -5,7 +5,8 @@ from app.core.database import Base, SessionLocal, engine
 from app.models import domain  # noqa: F401
 from app.services.neo4j_sync import Neo4jSyncService
 from app.services.rag import RagService
-from app.services.seed import seed_phase_two_data
+from app.services.schema_patches import apply_postgres_schema_patches
+from app.services.seed import backfill_null_org_user_passwords, seed_phase_two_data
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,13 @@ logger = logging.getLogger(__name__)
 def bootstrap_application() -> None:
     settings = get_settings()
     Base.metadata.create_all(bind=engine)
+    apply_postgres_schema_patches(engine)
+
+    with SessionLocal() as db:
+        filled = backfill_null_org_user_passwords(db)
+        if filled:
+            db.commit()
+            logger.info("bootstrap: đã gán mật khẩu demo (bcrypt) cho %s org user thiếu password_hash", filled)
 
     if settings.auto_seed:
         with SessionLocal() as db:
