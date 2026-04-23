@@ -1,4 +1,5 @@
 import { AdminShell } from "../../components/admin-shell";
+import { PurchaseRequestsPanel } from "../../components/purchase-requests-panel";
 import { getDashboardData } from "../../lib/api";
 
 export default async function WorkflowsPage() {
@@ -57,16 +58,7 @@ export default async function WorkflowsPage() {
             </div>
             <span className="module-tag">{purchaseRequests.length} request</span>
           </div>
-          <div className="list-stack">
-            {purchaseRequests.map((request) => (
-              <div className="list-item vertical" key={request.id}>
-                <strong>{request.status} · Approver: {request.final_approver ?? "-"}</strong>
-                <span>{request.reason}</span>
-                <span>Policy: {request.approval_policy_code ?? "-"}</span>
-              </div>
-            ))}
-            {!purchaseRequests.length ? <p className="empty-text">Chưa có purchase request. Hãy chạy suy luận.</p> : null}
-          </div>
+          <PurchaseRequestsPanel requests={purchaseRequests} />
         </article>
       </section>
     </AdminShell>

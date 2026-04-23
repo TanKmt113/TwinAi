@@ -22,6 +22,7 @@ actions:
   - create_sensor_alert
   - attach_telemetry_evidence
   - create_inspection_task_if_not_exists
+  - identify_notification_targets
 status: approved
 ```
 
@@ -107,6 +108,7 @@ POST /api/realtime-rules/evaluate
    - tạo hoặc update SensorAlert đang open.
    - attach telemetry evidence.
    - tạo inspection task nếu rule yêu cầu và chưa có task mở.
+   - lấy primary contact, backup contact và escalation policy cho asset/component bị ảnh hưởng.
    - sync Sensor/SensorAlert vào Neo4j.
    - ghi audit log.
 ```
@@ -119,6 +121,7 @@ Chat tool context cần thêm:
 get_asset_telemetry(asset_code)
 get_sensor_alerts(asset_code)
 get_sensor_history(sensor_code, time_range)
+get_notification_targets(asset_code, event_type)
 ```
 
 Guardrail:
@@ -136,6 +139,7 @@ Nếu thiếu telemetry history, trả "không đủ dữ liệu".
 - Realtime Rule Engine.
 - Neo4j sync cho Sensor, Metric, SensorAlert.
 - Alert list/detail UI.
+- Notification/escalation routing cho alert severity warning/critical.
 - Chat context có telemetry evidence.
 - Unit test cho threshold/window/min_samples.
 
@@ -147,7 +151,8 @@ Phase 08 đạt khi:
 2. Hệ thống tạo `SensorAlert` severity `warning` hoặc `critical`.
 3. Neo4j có chuỗi `Component -> Sensor -> Metric` và `SensorAlert -> Sensor`.
 4. Nếu rule cho phép, task kiểm tra được tạo.
-5. Chat trả lời được vì sao alert xuất hiện và dẫn evidence.
+5. Hệ thống xác định được ai cần được notify đầu tiên khi alert mở.
+6. Chat trả lời được vì sao alert xuất hiện và dẫn evidence.
 
 ## Rủi ro
 
@@ -157,3 +162,4 @@ Phase 08 đạt khi:
 | False positive | Dùng window + min_samples, không trigger từ 1 sample |
 | Neo4j chứa quá nhiều reading | Chỉ sync sensor/alert/state, không sync từng reading |
 | Chat diễn giải quá mức | Bắt buộc citation từ rule + telemetry evidence |
+| Sai người nhận alert | Bắt buộc map asset/component với owner/contact/escalation policy từ ontology |

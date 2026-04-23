@@ -66,6 +66,7 @@ Kỳ vọng:
 - Tạo `SensorAlert` open.
 - Evidence ghi đủ sensor_code, metric, values, measured_at, threshold.
 - Nếu rule cho phép, tạo inspection task.
+- Xác định được primary contact hoặc notification group cho alert này.
 
 ### Bước 4: Kiểm tra Neo4j
 
@@ -106,6 +107,7 @@ Kỳ vọng câu trả lời có:
 - Rule threshold.
 - Thời gian đo.
 - Alert/task liên quan nếu có.
+- Người cần được notify hoặc escalation path nếu alert vẫn mở.
 - Citations hoặc evidence từ telemetry/rule/manual.
 
 ### Bước 7: Resolve alert
@@ -115,6 +117,7 @@ Kỳ vọng:
 - Alert chuyển `resolved`.
 - 3D Twin trở về trạng thái bình thường nếu không còn alert open.
 - Audit log ghi action.
+- Notification/escalation state được cập nhật tương ứng.
 
 ## Checklist nghiệm thu
 
@@ -128,6 +131,7 @@ Kỳ vọng:
 - [ ] 3D Twin render đúng asset/component/sensor.
 - [ ] 3D Twin cập nhật theo telemetry/alert.
 - [ ] Chat dùng telemetry evidence.
+- [ ] Alert có org routing đúng người nhận.
 - [ ] Audit log ghi alert/task/resolve.
 
 ## Tiêu chí đạt
@@ -138,6 +142,7 @@ Digital Twin mở rộng đạt nếu demo được trong 10-15 phút:
 Gửi sensor reading giả lập
   -> dashboard thấy telemetry
   -> rule tạo alert
+  -> hệ thống biết cần báo cho ai
   -> ontology graph có sensor/alert
   -> 3D Twin đổi trạng thái
   -> chat giải thích có evidence
@@ -152,3 +157,4 @@ Chưa đạt nếu:
 - Alert tạo từ một sample đơn lẻ mà không có window/min_samples.
 - Neo4j không có Sensor/SensorAlert relationship.
 - Chat trả lời cảnh báo mà không có telemetry evidence.
+- Alert mở nhưng hệ thống không xác định được người nhận thông báo/escalation.

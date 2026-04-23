@@ -1,10 +1,21 @@
 import { AdminShell } from "../components/admin-shell";
 import { MetricCard } from "../components/metric-card";
+import { SystemServicesPanel } from "../components/system-services-panel";
 import { getDashboardData } from "../lib/api";
 
 export default async function OverviewPage() {
-  const { health, assets, tasks, purchaseRequests, agentRuns, manuals, selectedAsset } = await getDashboardData();
+  const { health, systemServices, assets, tasks, purchaseRequests, agentRuns, manuals, selectedAsset } =
+    await getDashboardData();
   const isOnline = health.status === "ok";
+  const infraSummary =
+    systemServices.overall === "ok"
+      ? "Hạ tầng OK"
+      : systemServices.overall === "critical"
+        ? "Hạ tầng: lỗi database"
+        : systemServices.overall === "degraded"
+          ? "Hạ tầng: cảnh báo"
+          : "Hạ tầng: không đọc được";
+  const headerStatus = `${isOnline ? "API online" : "API offline"} · ${infraSummary}`;
   const riskyAssets = assets.filter((asset) =>
     asset.components.some((component) => (component.remaining_lifetime_months ?? 999) <= 6),
   );
@@ -16,10 +27,12 @@ export default async function OverviewPage() {
     <AdminShell
       eyebrow="Overview"
       title="Tổng quan vận hành"
-      status={isOnline ? "API online" : "API offline"}
+      status={headerStatus}
       isOnline={isOnline}
       tag="Phase 04+"
     >
+      <SystemServicesPanel data={systemServices} />
+
       <section className="metric-grid" aria-label="KPI overview">
         <MetricCard title="Tài sản" value={assets.length} detail="thang máy đang theo dõi" />
         <MetricCard title="Rủi ro" value={riskyAssets.length} detail="asset có linh kiện <= 6 tháng" tone="danger" />

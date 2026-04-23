@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.schemas import AssetRead
 from app.services.neo4j_sync import Neo4jSyncService
 from app.services.repositories import AssetRepository
+from app.services.routing_context import build_asset_contacts
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
@@ -20,6 +21,15 @@ def get_asset(asset_id: str, db: Session = Depends(get_db)):
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     return asset
+
+
+@router.get("/{asset_id}/contacts")
+def get_asset_contacts(asset_id: str, db: Session = Depends(get_db)) -> dict:
+    repo = AssetRepository(db)
+    asset = repo.get_by_id(asset_id) or repo.get_by_code(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return build_asset_contacts(db, asset)
 
 
 @router.get("/{asset_id}/ontology")

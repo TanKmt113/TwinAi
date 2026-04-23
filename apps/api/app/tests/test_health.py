@@ -22,3 +22,16 @@ def test_dependency_health() -> None:
     response = client.get("/health/dependencies")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_services_health() -> None:
+    response = client.get("/health/services")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overall"] in ("ok", "degraded", "critical")
+    assert "checked_at" in body
+    assert isinstance(body["services"], list)
+    ids = {item["id"] for item in body["services"]}
+    assert {"api", "postgresql", "neo4j", "minio", "llm", "n8n"}.issubset(ids)
+    for item in body["services"]:
+        assert "label" in item and "ok" in item and "detail" in item

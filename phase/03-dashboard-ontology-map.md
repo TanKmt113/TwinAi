@@ -113,6 +113,10 @@ Phase 03 đạt khi:
 Calidas 1 -> Cáp kéo -> Rule -> Manual -> SparePart -> Inventory -> Purchase -> CEO
 ```
 
+Ghi chú mở rộng:
+
+- Viewer cho `primary contact`, `backup contact` hoặc `escalation target` thuộc phạm vi Phase 05 khi backend đã có org routing API tương ứng.
+
 ## Rủi ro
 
 | Rủi ro | Cách xử lý |

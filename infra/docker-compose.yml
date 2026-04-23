@@ -89,6 +89,8 @@ services:
     build:
       context: ../apps/api
     container_name: twinai-api
+    env_file:
+      - ../apps/api/.env
     environment:
       CORS_ORIGINS: http://localhost:3000
       DATABASE_URL: postgresql+psycopg://twinai:twinai@postgres:5432/twinai
@@ -99,13 +101,6 @@ services:
       MINIO_ACCESS_KEY: twinai
       MINIO_SECRET_KEY: twinai-minio-password
       MINIO_SECURE: "false"
-      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       N8N_WEBHOOK_URL: http://n8n:5678/webhook/twinai
     ports:
       - "8000:8000"

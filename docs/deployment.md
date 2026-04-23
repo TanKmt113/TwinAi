@@ -9,9 +9,13 @@ cd infra
 docker compose up --build
 ```
 
+## Biến môi trường LLM (Docker)
+
+Service `backend` trong `infra/docker-compose.yml` dùng `env_file: ../apps/api/.env` để nạp `GEMINI_*` / `OPENAI_*` / `LLM_PROVIDER` vào container. Không đặt `GEMINI_API_KEY: ${GEMINI_API_KEY:-}` trong `environment` với giá trị rỗng — sẽ ghi đè `env_file` và khiến API báo thiếu key.
+
 ## URL mặc định
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3000` nếu tự chạy `apps/web`; service frontend hiện chưa được bật mặc định trong `docker-compose.yml`.
 - Backend API: `http://localhost:8000`
 - Backend docs: `http://localhost:8000/docs`
 - Neo4j Browser: `http://localhost:7474`
@@ -47,6 +51,7 @@ password: twinai
 ```bash
 curl http://localhost:8000/health
 curl http://localhost:8000/health/dependencies
+curl http://localhost:8000/health/services
 ```
 
 ## Neo4j constraints

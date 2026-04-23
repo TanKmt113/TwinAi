@@ -43,12 +43,45 @@ class InspectionTaskRead(BaseModel):
 
 class PurchaseRequestRead(BaseModel):
     id: str
+    component_id: str
+    inventory_item_id: str
+    rule_id: str | None = None
     reason: str
     quantity_requested: int
     status: str
     approval_policy_code: str | None
     final_approver: str | None
     created_by_agent: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PurchaseRequestDetailRead(PurchaseRequestRead):
+    """Bổ sung asset/component để UI routing (contacts) không cần gọi thêm lookup."""
+
+    asset_id: str | None = None
+    asset_code: str | None = None
+    component_code: str | None = None
+
+
+class WorkflowActorBody(BaseModel):
+    actor_type: str = "user"
+    actor_id: str = "demo_user"
+    note: str | None = None
+
+
+class AuditLogRead(BaseModel):
+    id: str
+    actor_type: str
+    actor_id: str | None
+    action: str
+    entity_type: str
+    entity_id: str | None
+    before_json: dict[str, Any] | None
+    after_json: dict[str, Any] | None
+    reason: str | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -121,3 +154,31 @@ class ChatResponse(BaseModel):
     citations: list[Citation]
     agent_mode: str = "rule_fallback"
     tool_calls: list[str] = Field(default_factory=list)
+
+
+class OrgUnitRead(BaseModel):
+    id: str
+    code: str
+    name: str
+    level_kind: str
+    parent_id: str | None
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class OrgUserRead(BaseModel):
+    id: str
+    user_code: str
+    full_name: str
+    email: str | None
+    job_title: str | None
+    org_unit_id: str | None
+    org_unit_code: str | None = None
+    org_unit_name: str | None = None
+    manager_user_id: str | None
+    manager_user_code: str | None = None
+    role_tags: list[str]
+    is_active: bool
+
+    model_config = {"from_attributes": True}

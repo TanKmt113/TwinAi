@@ -5,7 +5,11 @@ from app.api.assets import router as assets_router
 from app.api.chat import router as chat_router
 from app.api.health import router as health_router
 from app.api.llm import router as llm_router
+from app.api.audit_logs import router as audit_logs_router
 from app.api.manuals import router as manuals_router
+from app.api.org import router as org_router
+from app.api.phase5_routing import router as phase5_routing_router
+from app.api.purchase_requests import router as purchase_requests_router
 from app.api.reasoning import router as reasoning_router
 from app.core.config import get_settings
 from app.services.bootstrap import bootstrap_application
@@ -31,9 +35,13 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(assets_router)
 app.include_router(reasoning_router)
+app.include_router(purchase_requests_router)
+app.include_router(audit_logs_router)
+app.include_router(phase5_routing_router)
 app.include_router(manuals_router)
 app.include_router(chat_router)
 app.include_router(llm_router)
+app.include_router(org_router)
 
 
 @app.on_event("startup")

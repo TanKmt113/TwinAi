@@ -135,6 +135,7 @@ MVP có thể polling mỗi 3-5 giây. SSE/WebSocket để Phase 08 hoặc 10.
 - API latest/history.
 - Telemetry panel trên dashboard.
 - Simulator script hoặc nút tạo reading giả lập.
+- Mapping sensor alert domain về asset owner / primary contact để phase 08 dùng cho notification.
 
 ## Tiêu chí hoàn thành
 
@@ -145,6 +146,7 @@ Phase 07 đạt khi:
 3. Dashboard hiển thị latest telemetry.
 4. History API trả dữ liệu theo sensor.
 5. Dữ liệu sensor map đúng về asset/component.
+6. Dữ liệu sensor có thể truy ra asset owner/contact từ ontology hiện có.
 
 ## Rủi ro
 

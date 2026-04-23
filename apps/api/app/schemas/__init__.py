@@ -1,6 +1,7 @@
 from app.schemas.domain import (
     AgentRunRead,
     AssetRead,
+    AuditLogRead,
     ComponentRead,
     ChatQuery,
     ChatResponse,
@@ -8,13 +9,18 @@ from app.schemas.domain import (
     InspectionTaskRead,
     ManualChunkRead,
     ManualRead,
+    OrgUnitRead,
+    OrgUserRead,
+    PurchaseRequestDetailRead,
     PurchaseRequestRead,
     ReasoningRunResponse,
+    WorkflowActorBody,
 )
 
 __all__ = [
     "AgentRunRead",
     "AssetRead",
+    "AuditLogRead",
     "ComponentRead",
     "ChatQuery",
     "ChatResponse",
@@ -22,6 +28,10 @@ __all__ = [
     "InspectionTaskRead",
     "ManualChunkRead",
     "ManualRead",
+    "OrgUnitRead",
+    "OrgUserRead",
+    "PurchaseRequestDetailRead",
     "PurchaseRequestRead",
     "ReasoningRunResponse",
+    "WorkflowActorBody",
 ]

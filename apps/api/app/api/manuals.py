@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import get_settings
 from app.schemas import ManualChunkRead, ManualRead
+from app.services.document_parser import DocumentParseError
+from app.services.embeddings import EmbeddingError
+from app.services.object_storage import ObjectStorageError
 from app.services.rag import RagService
 
 router = APIRouter(prefix="/api/manuals", tags=["manuals"])
@@ -33,7 +36,11 @@ async def upload_manual(
             code=code,
             title=title,
             rule_code=rule_code,
+            content_type=file.content_type,
         )
+    except (ObjectStorageError, EmbeddingError, DocumentParseError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
         trace = traceback.format_exc()
@@ -75,7 +82,11 @@ def parse_manual(manual_id: str, db: Session = Depends(get_db)):
     manual = service.get_manual(manual_id)
     if not manual:
         raise HTTPException(status_code=404, detail="Manual not found")
-    return service.parse_manual(manual)
+    try:
+        return service.parse_manual(manual)
+    except (ObjectStorageError, EmbeddingError, DocumentParseError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{manual_id}/chunks", response_model=list[ManualChunkRead])

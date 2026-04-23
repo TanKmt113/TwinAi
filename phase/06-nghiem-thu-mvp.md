@@ -57,6 +57,8 @@ Cáp kéo còn 5 tháng, tồn kho = 0, lead time = 7 tháng.
 ```
 
 - Người phê duyệt cuối: CEO.
+- Người nhận xử lý đầu tiên: kỹ thuật viên hoặc primary contact đã cấu hình.
+- Có backup contact hoặc escalation path cho asset.
 
 ### Bước 5: Kiểm tra Neo4j Ontology map
 
@@ -67,6 +69,9 @@ Calidas 1
   -> Cáp kéo Calidas 1
   -> Rule R-ELV-CABLE-001
   -> Manual bảo trì thang máy
+  -> Department Kỹ thuật
+  -> Primary Contact
+  -> Escalation Policy
   -> Bộ cáp kéo Calidas
   -> InventoryItem tồn kho 0
   -> PurchaseRequest
@@ -91,6 +96,7 @@ Kỳ vọng câu trả lời có:
 - Lead time.
 - Task đã tạo.
 - Purchase request draft.
+- Người cần được notify đầu tiên.
 - Người phê duyệt.
 - Citations.
 
@@ -116,6 +122,7 @@ Kỳ vọng:
 
 - Request chuyển từ `draft` sang `waiting_for_approval`.
 - n8n nhận webhook.
+- Hệ thống xác định đúng primary contact / backup contact / escalation target.
 - Approver approve/reject.
 - Audit log ghi đầy đủ.
 
@@ -133,12 +140,13 @@ Kỳ vọng:
 - [ ] Chat trả lời có citations.
 - [ ] Chat không hallucinate với câu hỏi ngoài phạm vi.
 - [ ] Approval flow chạy được.
+- [ ] Org routing xác định đúng primary contact / backup contact.
 - [ ] n8n webhook nhận event.
 - [ ] Audit log đầy đủ.
 
 ## Tiêu chí MVP đạt
 
-MVP đạt nếu có thể demo trọn vẹn trong 10-15 phút cho stakeholder, từ dữ liệu thang máy đến agent action, approval và câu trả lời có căn cứ.
+MVP đạt nếu có thể demo trọn vẹn trong 10-15 phút cho stakeholder, từ dữ liệu thang máy đến agent action, approval, notification/escalation và câu trả lời có căn cứ.
 
 ## Tiêu chí chưa đạt
 
@@ -147,6 +155,7 @@ MVP chưa đạt nếu:
 - Chỉ có chatbot nhưng không có Rule Engine.
 - Chỉ có bảng dữ liệu nhưng không có Neo4j graph.
 - Rule chạy nhưng không tạo task/purchase request.
+- Rule chạy nhưng không xác định được cần báo cho ai.
 - Chat trả lời không có citations.
 - Không có audit log.
 - Agent tự động gửi đơn mua hàng thật khi chưa phê duyệt.

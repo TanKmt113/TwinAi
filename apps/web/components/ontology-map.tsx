@@ -20,71 +20,87 @@ export function OntologyMap({ asset, ontology, purchaseRequests }: OntologyMapPr
     label: string;
     title: string;
     detail: string;
-    tone: "active" | "warn" | "danger" | "neutral";
+    tone: "asset" | "component" | "rule" | "manual" | "supply" | "purchase" | "person" | "context";
   }> = [
     {
       key: "asset",
       className: "asset",
-      label: "Asset",
+      label: "ASSET",
       title: asset?.name ?? "Chưa có asset",
       detail: asset?.code ?? "No asset code",
-      tone: "active",
+      tone: "asset",
     },
     {
       key: "component",
       className: "component",
-      label: "Component",
+      label: "CABLE",
       title: component?.name ?? "Chưa có component",
       detail: `${component?.remaining_lifetime_months ?? "-"} tháng còn lại`,
-      tone: "warn",
+      tone: "component",
     },
     {
       key: "rule",
       className: "rule",
-      label: "Rule",
+      label: "RULE",
       title: "R-ELV-CABLE-001",
       detail: "remaining_lifetime <= 6",
-      tone: "active",
+      tone: "rule",
     },
     {
       key: "manual",
       className: "manual",
-      label: "Manual",
+      label: "MANUAL",
       title: textValue(manual, "code") ?? "MAN-ELV-001",
       detail: textValue(manual, "title") ?? "Nguồn kỹ thuật",
-      tone: "active",
+      tone: "manual",
     },
     {
       key: "spare",
       className: "spare",
-      label: "Spare part",
+      label: "SPARE",
       title: component?.spare_part_code ?? "Chưa có phụ tùng",
       detail: "phụ tùng thay thế",
-      tone: component?.spare_part_code ? "danger" : "neutral",
+      tone: "supply",
     },
     {
       key: "inventory",
       className: "inventory",
-      label: "Inventory",
+      label: "STOCK",
       title: textValue(inventory, "code") ?? component?.spare_part_code ?? "Chưa có tồn kho",
       detail: `quantity = ${textValue(inventory, "quantity_on_hand") ?? "0"}`,
-      tone: "danger",
+      tone: "supply",
     },
     {
       key: "purchase",
       className: "purchase",
-      label: "Purchase",
+      label: "PURCHASE",
       title: purchase?.status ?? "Chưa tạo request",
       detail: purchase ? `qty ${purchase.quantity_requested}` : "draft sau reasoning",
-      tone: purchase ? "active" : "neutral",
+      tone: "purchase",
     },
     {
       key: "approver",
       className: "approver",
-      label: "Approver",
+      label: "APPROVER",
       title: purchase?.final_approver ?? textValue(approver, "name") ?? "Chưa xác định",
       detail: purchase?.approval_policy_code ?? "approval policy",
-      tone: purchase ? "active" : "neutral",
+      tone: "person",
+    },
+    {
+      key: "task",
+      className: "task",
+      label: "TASK",
+      title: "Inspection",
+      detail: "technical evidence",
+      tone: "context",
+    },
+    {
+      key: "risk",
+      className: "risk",
+      label: "RISK",
+      title: "Cable lifetime",
+      detail: "5 <= 6 months",
+      tone: "component",
     },
   ];
 
@@ -98,23 +114,42 @@ export function OntologyMap({ asset, ontology, purchaseRequests }: OntologyMapPr
           <span><i className="legend-dot danger" /> Rủi ro vận hành</span>
         </div>
       </div>
-      <div className="ontology-graph" aria-label="Ontology relationship graph">
+      <div className="ontology-graph bubble-graph" aria-label="Ontology relationship graph">
         <svg className="graph-lines" viewBox="0 0 1120 390" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M190 194 H250" />
-          <path d="M400 174 C440 86 470 86 500 86" />
-          <path d="M650 86 H720" />
-          <path d="M400 214 C440 304 470 304 500 304" />
-          <path d="M650 304 H720" />
-          <path d="M870 304 C920 304 920 235 920 194" />
-          <path d="M995 240 V270" />
+          <defs>
+            <marker id="arrow" markerHeight="10" markerWidth="10" orient="auto" refX="8" refY="3">
+              <path d="M0,0 L0,6 L9,3 z" />
+            </marker>
+          </defs>
+          <path d="M210 150 L320 170" />
+          <path d="M430 170 L555 112" markerEnd="url(#arrow)" />
+          <path d="M685 112 L790 112" markerEnd="url(#arrow)" />
+          <path d="M435 205 L560 254" markerEnd="url(#arrow)" />
+          <path d="M675 260 L780 250" markerEnd="url(#arrow)" />
+          <path d="M890 242 L950 178" markerEnd="url(#arrow)" />
+          <path d="M1005 190 L1028 270" markerEnd="url(#arrow)" />
+          <path d="M370 130 L410 72" />
+          <path d="M180 178 L95 250" markerEnd="url(#arrow)" />
+          <path d="M535 92 L455 64" />
+          <path d="M770 132 L710 190" />
+          <path d="M760 276 L710 330" />
+          <path d="M930 150 L875 75" />
         </svg>
+        <div className="graph-group-label asset-group">DIGITAL TWIN</div>
+        <div className="graph-group-label knowledge-group">KNOWLEDGE</div>
+        <div className="graph-group-label supply-group">SUPPLY</div>
+        <div className="graph-group-label workflow-group">WORKFLOW</div>
         {nodes.map((node) => (
-          <div className={`graph-node ${node.className} ${node.tone}`} key={node.key}>
+          <div className={`graph-node bubble-node ${node.className} ${node.tone}`} key={node.key}>
             <span>{node.label}</span>
             <strong>{node.title}</strong>
             <small>{node.detail}</small>
           </div>
         ))}
+        <div className="satellite sat-a" />
+        <div className="satellite sat-b" />
+        <div className="satellite sat-c" />
+        <div className="satellite sat-d" />
       </div>
     </div>
   );

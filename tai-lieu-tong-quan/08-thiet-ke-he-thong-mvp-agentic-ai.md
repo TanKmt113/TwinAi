@@ -6,17 +6,18 @@ Tài liệu này thiết kế hệ thống MVP dựa trên:
 - `06-tech-stack-de-xuat.md`
 - `07-gia-lap-khoi-dong-mvp-thang-may.md`
 
-Phạm vi thiết kế: hệ thống nội bộ cho use case **bảo trì thang máy - cảnh báo cáp kéo sắp hết tuổi thọ - tạo task kiểm tra - đề xuất mua hàng - phê duyệt**.
+Phạm vi thiết kế: hệ thống nội bộ cho use case **bảo trì thang máy - cảnh báo cáp kéo sắp hết tuổi thọ - tạo task kiểm tra - đề xuất mua hàng - phê duyệt - thông báo/escalation đúng người phụ trách**.
 
 ## 1. Mục tiêu hệ thống
 
-Hệ thống MVP cần chứng minh được 5 năng lực:
+Hệ thống MVP cần chứng minh được 6 năng lực:
 
-1. Lưu dữ liệu vận hành có cấu trúc: thang máy, linh kiện, tồn kho, quy trình phê duyệt.
+1. Lưu dữ liệu vận hành có cấu trúc: thang máy, linh kiện, tồn kho, quy trình phê duyệt và cơ cấu tổ chức xử lý.
 2. Lưu manual/quy trình và cho phép truy xuất nguồn căn cứ.
 3. Chạy rule Ontology để phát hiện điều kiện cần hành động.
 4. Tạo hành động vận hành: cảnh báo, task kiểm tra, đề xuất mua hàng.
-5. Cho phép hỏi đáp tiếng Việt dựa trên dữ liệu thật và rule đã phê duyệt.
+5. Xác định được cần báo cho ai, escalate cho ai và ai là người phê duyệt cuối.
+6. Cho phép hỏi đáp tiếng Việt dựa trên dữ liệu thật và rule đã phê duyệt.
 
 ## 2. Nguyên tắc thiết kế
 
@@ -27,6 +28,8 @@ Ontology/rule engine quyết định:
 - Có cảnh báo hay không.
 - Có cần task kiểm tra hay không.
 - Có cần đề xuất mua hàng hay không.
+- Ai là người xử lý đầu tiên.
+- Khi quá SLA thì escalate cho ai.
 - Ai là người phê duyệt.
 
 LLM chỉ làm:
@@ -42,7 +45,7 @@ LLM chỉ làm:
 MVP chỉ cần chạy đúng một chuỗi:
 
 ```text
-Thang máy -> Cáp kéo -> Tuổi thọ còn lại -> Rule kiểm tra -> Tồn kho -> Mua hàng -> Phê duyệt
+Thang máy -> Cáp kéo -> Tuổi thọ còn lại -> Rule kiểm tra -> Tồn kho -> Mua hàng -> Phê duyệt -> Thông báo/escalation
 ```
 
 Không mở rộng sang PCCC, bãi xe, housekeeping hoặc toàn bộ ERP trong giai đoạn này.
@@ -93,6 +96,7 @@ Deploy: Docker Compose nội bộ
 ┌─────────────────────────────────────────────────────────────┐
 │                         Next.js UI                          │
 │ Dashboard | Ontology Map | Chat | Task | Purchase | Admin    │
+│ Approval Queue | Notification / Escalation Viewer            │
 └──────────────────────────────┬──────────────────────────────┘
                                │ REST/JSON
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -115,6 +119,7 @@ Deploy: Docker Compose nội bộ
 ┌──────────────▼────────────────────────────────▼──────────────┐
 │                    Backend Domain Services                   │
 │ Ontology Service | Rule Engine | RAG Service | Agent Worker   │
+│ Org Routing Service | Notification Service | Approval Service │
 └──────────────┬───────────────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────────────┐
@@ -194,6 +199,7 @@ ApprovalService
 ChatService
 AuditService
 NotificationService
+OrgRoutingService
 ```
 
 ### 5.3. Ontology Service
@@ -207,6 +213,9 @@ Ontology Service chịu trách nhiệm trả lời các câu hỏi dạng quan h
 - Phụ tùng nào dùng để thay linh kiện này?
 - Phụ tùng này tồn kho bao nhiêu?
 - Yêu cầu mua hàng này cần ai phê duyệt?
+- Asset này thuộc bộ phận nào?
+- Khi có sự cố thì cần báo cho ai trước?
+- Nếu chưa xử lý thì cần escalate lên ai?
 
 Trong MVP, Ontology Service query Neo4j bằng Cypher. PostgreSQL vẫn là nơi lưu dữ liệu giao dịch, còn Neo4j là nơi biểu diễn quan hệ Ontology.
 
@@ -217,9 +226,21 @@ Graph model MVP:
 (:Component)-[:HAS_TYPE]->(:ComponentType)
 (:Component)-[:APPLIES_RULE]->(:Rule)
 (:Rule)-[:BASED_ON]->(:Manual)
+(:Asset)-[:OWNED_BY]->(:Department)
+(:Asset)-[:PRIMARY_CONTACT]->(:User)
+(:Asset)-[:BACKUP_CONTACT]->(:User)
+(:User)-[:BELONGS_TO]->(:Department)
+(:User)-[:HAS_ROLE]->(:Role)
+(:User)-[:REPORTS_TO]->(:User)
 (:Component)-[:REQUIRES_SPARE_PART]->(:SparePart)
 (:SparePart)-[:STORED_AS]->(:InventoryItem)
 (:InventoryItem)-[:TRIGGERS_PURCHASE]->(:PurchaseRequest)
+(:Rule)-[:USES_ESCALATION_POLICY]->(:EscalationPolicy)
+(:Rule)-[:NOTIFIES_GROUP]->(:NotificationGroup)
+(:EscalationPolicy)-[:LEVEL_1_CONTACT]->(:User)
+(:EscalationPolicy)-[:LEVEL_2_CONTACT]->(:User)
+(:EscalationPolicy)-[:FINAL_ESCALATION]->(:User)
+(:NotificationGroup)-[:HAS_MEMBER]->(:User)
 (:PurchaseRequest)-[:REQUIRES_APPROVAL]->(:ApprovalPolicy)
 (:ApprovalPolicy)-[:FINAL_APPROVER]->(:User)
 ```
@@ -230,11 +251,23 @@ Ví dụ truy vấn Ontology cho một thang máy:
 MATCH (a:Asset {code: $asset_code})-[:HAS_COMPONENT]->(c:Component)
 OPTIONAL MATCH (c)-[:APPLIES_RULE]->(r:Rule)
 OPTIONAL MATCH (r)-[:BASED_ON]->(m:Manual)
+OPTIONAL MATCH (a)-[:OWNED_BY]->(d:Department)
+OPTIONAL MATCH (a)-[:PRIMARY_CONTACT]->(pc:User)
+OPTIONAL MATCH (a)-[:BACKUP_CONTACT]->(bc:User)
 OPTIONAL MATCH (c)-[:REQUIRES_SPARE_PART]->(sp:SparePart)-[:STORED_AS]->(inv:InventoryItem)
+OPTIONAL MATCH (r)-[:USES_ESCALATION_POLICY]->(ep:EscalationPolicy)
+OPTIONAL MATCH (r)-[:NOTIFIES_GROUP]->(ng:NotificationGroup)
 OPTIONAL MATCH (pr:PurchaseRequest)-[:FOR_COMPONENT]->(c)
 OPTIONAL MATCH (pr)-[:REQUIRES_APPROVAL]->(ap:ApprovalPolicy)-[:FINAL_APPROVER]->(u:User)
-RETURN a, c, r, m, sp, inv, pr, ap, u
+RETURN a, c, r, m, d, pc, bc, sp, inv, ep, ng, pr, ap, u
 ```
+
+Ontology tổ chức cần phân biệt rõ:
+
+- `ApprovalPolicy`: ai có quyền phê duyệt hành động chính thức.
+- `EscalationPolicy`: khi cảnh báo chưa được acknowledge hoặc vượt SLA thì báo lên ai.
+- `NotificationGroup`: nhóm người nhận thông báo theo domain hoặc severity.
+- `PRIMARY_CONTACT` / `BACKUP_CONTACT`: người xử lý đầu tiên và người dự phòng cho từng asset hoặc component quan trọng.
 
 ### 5.4. Rule Engine
 
@@ -324,8 +357,9 @@ Agent Worker làm:
 7. Kiểm tra tồn kho.
 8. Tạo đề xuất mua hàng nếu điều kiện đúng.
 9. Xác định approval flow.
-10. Gửi notification qua n8n nếu cần.
-11. Lưu agent run và audit log.
+10. Xác định người nhận thông báo đầu tiên, backup contact và escalation path.
+11. Gửi notification qua n8n nếu cần.
+12. Lưu agent run và audit log.
 
 ### 5.8. Neo4j Sync Service
 
@@ -350,6 +384,11 @@ upsert_spare_part_node
 upsert_inventory_node
 upsert_purchase_request_node
 upsert_approval_policy_node
+upsert_user_node
+upsert_department_node
+upsert_role_node
+upsert_escalation_policy_node
+upsert_notification_group_node
 merge_relationships
 ```
 
@@ -360,6 +399,14 @@ merge_relationships
 ```text
 users
   └── approvals
+
+departments
+  └── users
+
+notification_groups
+  └── notification_group_members
+
+escalation_policies
 
 assets
   └── components
@@ -398,6 +445,9 @@ PurchaseRequest
 ApprovalPolicy
 User
 Department
+Role
+EscalationPolicy
+NotificationGroup
 ```
 
 Relationship types:
@@ -405,9 +455,20 @@ Relationship types:
 ```text
 (Asset)-[:HAS_COMPONENT]->(Component)
 (Asset)-[:OWNED_BY]->(Department)
+(Asset)-[:PRIMARY_CONTACT]->(User)
+(Asset)-[:BACKUP_CONTACT]->(User)
 (Component)-[:HAS_TYPE]->(ComponentType)
 (Component)-[:APPLIES_RULE]->(Rule)
 (Rule)-[:BASED_ON]->(Manual)
+(User)-[:BELONGS_TO]->(Department)
+(User)-[:HAS_ROLE]->(Role)
+(User)-[:REPORTS_TO]->(User)
+(Rule)-[:USES_ESCALATION_POLICY]->(EscalationPolicy)
+(Rule)-[:NOTIFIES_GROUP]->(NotificationGroup)
+(EscalationPolicy)-[:LEVEL_1_CONTACT]->(User)
+(EscalationPolicy)-[:LEVEL_2_CONTACT]->(User)
+(EscalationPolicy)-[:FINAL_ESCALATION]->(User)
+(NotificationGroup)-[:HAS_MEMBER]->(User)
 (Component)-[:REQUIRES_SPARE_PART]->(SparePart)
 (SparePart)-[:STORED_AS]->(InventoryItem)
 (Component)-[:HAS_INSPECTION_TASK]->(InspectionTask)
@@ -428,6 +489,10 @@ CREATE CONSTRAINT spare_part_code IF NOT EXISTS FOR (n:SparePart) REQUIRE n.code
 CREATE CONSTRAINT inventory_code IF NOT EXISTS FOR (n:InventoryItem) REQUIRE n.code IS UNIQUE;
 CREATE CONSTRAINT purchase_request_id IF NOT EXISTS FOR (n:PurchaseRequest) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT user_id IF NOT EXISTS FOR (n:User) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT department_code IF NOT EXISTS FOR (n:Department) REQUIRE n.code IS UNIQUE;
+CREATE CONSTRAINT role_code IF NOT EXISTS FOR (n:Role) REQUIRE n.code IS UNIQUE;
+CREATE CONSTRAINT escalation_policy_code IF NOT EXISTS FOR (n:EscalationPolicy) REQUIRE n.code IS UNIQUE;
+CREATE CONSTRAINT notification_group_code IF NOT EXISTS FOR (n:NotificationGroup) REQUIRE n.code IS UNIQUE;
 ```
 
 Ví dụ seed graph từ dữ liệu giả lập:
@@ -451,10 +516,38 @@ SET inv.quantity_on_hand = 0, inv.lead_time_months = 7;
 MERGE (u:User {id: "CEO"})
 SET u.name = "CEO";
 
+MERGE (d:Department {code: "TECH"})
+SET d.name = "Bộ phận kỹ thuật";
+
+MERGE (mgr:User {id: "TECH-MANAGER"})
+SET mgr.name = "Trưởng bộ phận kỹ thuật";
+
+MERGE (tech:User {id: "TECH-01"})
+SET tech.name = "Kỹ thuật viên trực";
+
+MERGE (ep:EscalationPolicy {code: "ELV-CRITICAL-01"})
+SET ep.name = "Escalation cho sự cố thang máy critical";
+
+MERGE (ng:NotificationGroup {code: "TECH-OPS"})
+SET ng.name = "Nhóm kỹ thuật vận hành";
+
 MERGE (a)-[:HAS_COMPONENT]->(c)
+MERGE (a)-[:OWNED_BY]->(d)
+MERGE (a)-[:PRIMARY_CONTACT]->(tech)
+MERGE (a)-[:BACKUP_CONTACT]->(mgr)
 MERGE (c)-[:APPLIES_RULE]->(r)
+MERGE (r)-[:USES_ESCALATION_POLICY]->(ep)
+MERGE (r)-[:NOTIFIES_GROUP]->(ng)
 MERGE (c)-[:REQUIRES_SPARE_PART]->(sp)
-MERGE (sp)-[:STORED_AS]->(inv);
+MERGE (sp)-[:STORED_AS]->(inv)
+MERGE (tech)-[:BELONGS_TO]->(d)
+MERGE (mgr)-[:BELONGS_TO]->(d)
+MERGE (tech)-[:REPORTS_TO]->(mgr)
+MERGE (ep)-[:LEVEL_1_CONTACT]->(tech)
+MERGE (ep)-[:LEVEL_2_CONTACT]->(mgr)
+MERGE (ep)-[:FINAL_ESCALATION]->(u)
+MERGE (ng)-[:HAS_MEMBER]->(tech)
+MERGE (ng)-[:HAS_MEMBER]->(mgr);
 ```
 
 ### 6.3. Bảng `assets`
@@ -470,6 +563,51 @@ CREATE TABLE assets (
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 6.3a. Bảng tổ chức và routing
+
+```sql
+CREATE TABLE departments (
+  id UUID PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  parent_department_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE users (
+  id UUID PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  department_id UUID REFERENCES departments(id),
+  role_code TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  manager_user_id UUID,
+  is_on_call BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE escalation_policies (
+  id UUID PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  level_1_user_id UUID REFERENCES users(id),
+  level_2_user_id UUID REFERENCES users(id),
+  final_escalation_user_id UUID REFERENCES users(id),
+  acknowledge_sla_minutes INT,
+  resolve_sla_minutes INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE notification_groups (
+  id UUID PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  channel_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -558,6 +696,7 @@ CREATE TABLE rules (
   source_manual_id UUID REFERENCES manuals(id),
   owner_department TEXT,
   owner_user_id UUID,
+  escalation_policy_id UUID,
   status TEXT NOT NULL DEFAULT 'draft',
   version INT NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -741,6 +880,16 @@ POST   /api/purchase-requests/{request_id}/reject
 
 ```text
 POST   /api/chat/query
+```
+
+### 7.10. Organization / Notification Routing
+
+```text
+GET    /api/departments
+GET    /api/users
+GET    /api/assets/{asset_id}/contacts
+GET    /api/rules/{rule_id}/notification-targets
+GET    /api/escalation-policies/{policy_id}
 ```
 
 Request:
@@ -955,6 +1104,7 @@ admin
 ai_team
 technical_manager
 technician
+on_call
 warehouse_staff
 purchase_staff
 approver
@@ -963,18 +1113,19 @@ viewer
 
 ### 11.2. Permission matrix MVP
 
-| Chức năng | Admin | AI Team | Trưởng kỹ thuật | Kỹ thuật viên | Kho | Mua hàng | Approver | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Xem dashboard | Có | Có | Có | Có | Có | Có | Có | Có |
-| Quản lý tài sản | Có | Có | Có | Không | Không | Không | Không | Xem |
-| Upload manual | Có | Có | Có | Không | Không | Không | Không | Không |
-| Tạo rule draft | Có | Có | Có | Không | Không | Không | Không | Không |
-| Approve rule | Có | Không | Có | Không | Không | Không | Không | Không |
-| Chạy reasoning | Có | Có | Có | Không | Không | Không | Không | Không |
-| Hoàn thành task | Có | Không | Có | Có | Không | Không | Không | Không |
-| Cập nhật tồn kho | Có | Không | Không | Không | Có | Không | Không | Không |
-| Xử lý mua hàng | Có | Không | Không | Không | Không | Có | Không | Không |
-| Phê duyệt mua hàng | Có | Không | Không | Không | Không | Không | Có | Không |
+| Chức năng | Admin | AI Team | Trưởng kỹ thuật | Kỹ thuật viên | On-call | Kho | Mua hàng | Approver | Viewer |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Xem dashboard | Có | Có | Có | Có | Có | Có | Có | Có | Có |
+| Quản lý tài sản | Có | Có | Có | Không | Không | Không | Không | Không | Xem |
+| Upload manual | Có | Có | Có | Không | Không | Không | Không | Không | Không |
+| Tạo rule draft | Có | Có | Có | Không | Không | Không | Không | Không | Không |
+| Approve rule | Có | Không | Có | Không | Không | Không | Không | Không | Không |
+| Chạy reasoning | Có | Có | Có | Không | Không | Không | Không | Không | Không |
+| Hoàn thành task | Có | Không | Có | Có | Có | Không | Không | Không | Không |
+| Nhận escalation ngoài giờ | Có | Không | Có | Không | Có | Không | Không | Không | Không |
+| Cập nhật tồn kho | Có | Không | Không | Không | Không | Có | Không | Không | Không |
+| Xử lý mua hàng | Có | Không | Không | Không | Không | Không | Có | Không | Không |
+| Phê duyệt mua hàng | Có | Không | Không | Không | Không | Không | Không | Có | Không |
 
 ## 12. Audit và truy vết
 

@@ -20,6 +20,7 @@ const navItems = [
   { href: "/ontology", label: "Ontology" },
   { href: "/manuals", label: "Manual / RAG" },
   { href: "/workflows", label: "Task / Mua hàng" },
+  { href: "/audit-logs", label: "Audit log" },
 ];
 
 export function AdminShell({ title, eyebrow, status, isOnline, tag, children }: AdminShellProps) {

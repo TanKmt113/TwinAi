@@ -22,6 +22,8 @@ Upload manual
 
 ## Công cụ
 
+**Theo spec gốc (tài liệu thiết kế):**
+
 ```text
 Storage: MinIO
 Parsing: Docling hoặc Unstructured
@@ -29,6 +31,19 @@ OCR: Tesseract nếu tài liệu scan
 Embedding: text-embedding-3-small
 Vector store: PostgreSQL + pgvector
 LLM: OpenAI API
+```
+
+**Theo code hiện tại (đồng bộ repo):**
+
+```text
+Storage: MinIO (upload/đọc file manual)
+Parse: txt, md, csv, pdf (pypdf), docx — không dùng Docling/Unstructured trong MVP này
+Embedding: Gemini (gemini-embedding-*) hoặc OpenAI (text-embedding-3-small) theo LLM_PROVIDER
+Vector search: PostgreSQL + pgvector; truy vấn chỉ so khớp chunk cùng số chiều với embedding query (tránh lỗi legacy chunk dimension khác)
+LLM chat: Gemini hoặc OpenAI (JSON response) qua LlmAgentClient
+Health: GET /health/services (Postgres, Neo4j, MinIO, LLM, n8n); UI Tổng quan hiển thị trạng thái dịch vụ
+Chat UI: banner “LLM đang bật / không gọi LLM” + agent_mode kỹ thuật
+Docker: backend dùng env_file ../apps/api/.env để GEMINI_* / OPENAI_* không bị ghi đè rỗng bởi ${VAR:-}
 ```
 
 ## API cần build
@@ -46,6 +61,7 @@ POST /api/chat/query
 
 ```text
 asset_risk_query
+asset_component_count_query
 rule_explanation
 purchase_reason
 approval_query
@@ -53,16 +69,24 @@ manual_source_query
 out_of_scope
 ```
 
+`asset_component_count_query`: phân loại khi hỏi số lượng linh kiện; context chat không kéo rule/manual/purchase không cần thiết.
+
 ## Tool mà LLM được gọi
 
+Trong response `tool_calls` (chuỗi logic, không phải HTTP endpoint riêng):
+
 ```text
-get_asset_risks()
-get_asset_ontology(asset_code)
-get_rule(rule_code)
-search_manual_chunks(query)
-get_purchase_request_reason(request_id)
-get_approval_policy(request_type)
+classify_intent
+get_asset_risks
+get_asset_component_counts
+get_asset_ontology
+get_rule
+search_manual_chunks
+get_purchase_request_reason
+get_approval_policy
 ```
+
+Với intent `asset_component_count_query`, chỉ dùng: `classify_intent`, `get_asset_component_counts`, `get_asset_ontology`.
 
 ## Chat agent flow
 
@@ -141,6 +165,24 @@ Hệ thống trả lời có:
 - Dữ liệu tồn kho.
 - Người phê duyệt.
 - Citations.
+
+Ghi chú mở rộng:
+
+- Câu hỏi kiểu `notification_query` hoặc `escalation_query` sẽ thuộc phạm vi Phase 05 sau khi org routing API được implement.
+
+---
+
+## Trạng thái hoàn thành vs tồn đọng (trước Phase 05)
+
+**Đã đáp ứng tiêu chí cốt lõi Phase 04:** upload/parse/chunk/embed/search manual, chat có citations + `agent_mode` + `tool_calls`, guardrail out-of-scope, Neo4j link manual–rule khi sync bật.
+
+**Tồn đọng nhẹ (không chặn Phase 05):**
+
+- Dữ liệu seed/manual cũ có thể còn embedding dimension khác model hiện tại — code đã lọc theo chiều vector; nên re-parse manual để dữ liệu đồng nhất.
+- OCR/Tesseract và Docling chưa tích hợp; PDF scan chất lượng kém có thể parse kém.
+- Chat chưa gọi trực tiếp bảng `org_users` / `org_units` (đã có trong DB — xem Phase 05 và `docs/api.md`); routing “báo cho ai” vẫn chủ yếu từ `final_approver` chuỗi trên purchase + department_owner trên asset.
+
+**Kết luận:** Có thể bắt đầu Phase 05 khi đã xác nhận manual/RAG/chat chạy ổn trên môi trường deploy; các hạng mục trên là cải tiến song song, không phải blocker cứng.
 
 Với câu hỏi ngoài phạm vi:
 

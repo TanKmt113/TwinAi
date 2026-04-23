@@ -71,6 +71,43 @@ class ChatService:
         return response
 
     def _build_tool_context(self, question: str, intent: str) -> dict[str, Any]:
+        requested_asset_code = self._extract_asset_code(question)
+        ontology_context = self._get_ontology_context(requested_asset_code)
+        all_assets = list(self.db.scalars(select(Asset).order_by(Asset.code)))
+
+        asset_component_counts = []
+        for asset in all_assets:
+            components = list(self.db.scalars(select(Component).where(Component.asset_id == asset.id).order_by(Component.code)))
+            asset_component_counts.append(
+                {
+                    "asset_code": asset.code,
+                    "asset_name": asset.name,
+                    "component_count": len(components),
+                    "component_codes": [component.code for component in components],
+                    "component_names": [component.name for component in components],
+                }
+            )
+
+        if intent == "asset_component_count_query":
+            return {
+                "intent": intent,
+                "requested_asset_code": requested_asset_code,
+                "asset_risks": [],
+                "asset_component_counts": asset_component_counts,
+                "ontology_context": ontology_context,
+                "rule": None,
+                "manual_chunks": [],
+                "open_tasks": [],
+                "purchase_requests": [],
+                "approval_policy": [],
+                "citations": [],
+                "tool_calls": [
+                    "classify_intent",
+                    "get_asset_component_counts",
+                    "get_asset_ontology",
+                ],
+            }
+
         tool_calls = [
             "classify_intent",
             "get_asset_risks",
@@ -99,8 +136,6 @@ class ChatService:
             self.db.scalars(select(PurchaseRequest).where(PurchaseRequest.status.in_(["draft", "waiting_for_approval"])))
         )
         inventory_items = list(self.db.scalars(select(InventoryItem).order_by(InventoryItem.code)))
-        requested_asset_code = self._extract_asset_code(question)
-        ontology_context = self._get_ontology_context(requested_asset_code)
 
         risk_rows = []
         for component in risky_components:
@@ -136,6 +171,7 @@ class ChatService:
             "intent": intent,
             "requested_asset_code": requested_asset_code,
             "asset_risks": risk_rows,
+            "asset_component_counts": asset_component_counts,
             "ontology_context": ontology_context,
             "rule": {
                 "code": rule.code,
@@ -190,34 +226,63 @@ class ChatService:
     ) -> ChatResponse:
         evidence = []
         asset_risks = tool_context["asset_risks"]
-        if asset_risks:
+        asset_component_counts = tool_context["asset_component_counts"]
+        if intent == "asset_component_count_query":
+            target_row = self._pick_asset_component_count(
+                rows=asset_component_counts,
+                requested_asset_code=tool_context["requested_asset_code"],
+            )
+            if target_row:
+                evidence.append(
+                    f"{target_row['asset_name']} ({target_row['asset_code']}) hiện có {target_row['component_count']} linh kiện theo dõi."
+                )
+                if target_row["component_names"]:
+                    evidence.append("Danh sách linh kiện: " + ", ".join(target_row["component_names"]) + ".")
+            elif asset_component_counts:
+                total_components = sum(item["component_count"] for item in asset_component_counts)
+                evidence.append(f"Hệ thống đang theo dõi {len(asset_component_counts)} tài sản và tổng {total_components} linh kiện.")
+                for item in asset_component_counts:
+                    evidence.append(f"{item['asset_code']}: {item['component_count']} linh kiện.")
+        elif asset_risks:
             evidence.extend(
                 [
                     f"{risk['component_name']} còn {risk['remaining_lifetime_months']} tháng tuổi thọ."
                     for risk in asset_risks
                 ]
             )
-        if tool_context["open_tasks"]:
+        if intent != "asset_component_count_query" and tool_context["open_tasks"]:
             evidence.append(f"Hệ thống có {len(tool_context['open_tasks'])} task kiểm tra đang mở.")
-        if tool_context["purchase_requests"]:
+        if intent != "asset_component_count_query" and tool_context["purchase_requests"]:
             evidence.extend([f"Purchase request: {request['reason']}" for request in tool_context["purchase_requests"]])
-        if tool_context["manual_chunks"]:
+        if intent != "asset_component_count_query" and tool_context["manual_chunks"]:
             evidence.append(f"Tìm thấy {len(tool_context['manual_chunks'])} đoạn manual liên quan.")
 
-        conclusion = self._build_conclusion(intent, asset_risks, tool_context["purchase_requests"])
+        conclusion = self._build_conclusion(
+            intent,
+            asset_risks,
+            tool_context["purchase_requests"],
+            asset_component_counts,
+            tool_context["requested_asset_code"],
+        )
         missing_data = [] if tool_context["citations"] else ["Chưa có manual chunk/citation liên quan."]
+        if intent == "asset_component_count_query":
+            missing_data = []
         if extra_missing_data:
             missing_data.extend(extra_missing_data)
+
+        recommended_actions = [
+            "Kiểm tra task kỹ thuật đã tạo.",
+            "Xác nhận tồn kho phụ tùng.",
+            "Trình phê duyệt purchase request nếu dữ liệu đúng.",
+        ]
+        if intent == "asset_component_count_query":
+            recommended_actions = ["Xem chi tiết asset để kiểm tra danh sách linh kiện và trạng thái hiện tại nếu cần."]
 
         return ChatResponse(
             intent=intent,
             conclusion=conclusion,
             evidence=evidence,
-            recommended_actions=[
-                "Kiểm tra task kỹ thuật đã tạo.",
-                "Xác nhận tồn kho phụ tùng.",
-                "Trình phê duyệt purchase request nếu dữ liệu đúng.",
-            ],
+            recommended_actions=recommended_actions,
             missing_data=missing_data,
             citations=tool_context["citations"],
             agent_mode=agent_mode,
@@ -286,6 +351,11 @@ class ChatService:
     @staticmethod
     def _classify(question: str) -> str:
         normalized = question.lower()
+        if (
+            ("bao nhiêu" in normalized or "có mấy" in normalized or "số lượng" in normalized)
+            and any(keyword in normalized for keyword in ["linh kiện", "component"])
+        ):
+            return "asset_component_count_query"
         if any(keyword in normalized for keyword in ["doanh thu", "revenue", "marketing", "lương", "nhân sự"]):
             return "out_of_scope"
         if any(keyword in normalized for keyword in ["phê duyệt", "duyệt", "ceo", "approver"]):
@@ -299,7 +369,24 @@ class ChatService:
         return "asset_risk_query"
 
     @staticmethod
-    def _build_conclusion(intent: str, asset_risks: list[dict[str, Any]], purchase_requests: list[dict[str, Any]]) -> str:
+    def _build_conclusion(
+        intent: str,
+        asset_risks: list[dict[str, Any]],
+        purchase_requests: list[dict[str, Any]],
+        asset_component_counts: list[dict[str, Any]],
+        requested_asset_code: str | None,
+    ) -> str:
+        if intent == "asset_component_count_query":
+            target_row = ChatService._pick_asset_component_count(asset_component_counts, requested_asset_code)
+            if target_row:
+                return (
+                    f"{target_row['asset_name']} ({target_row['asset_code']}) hiện có "
+                    f"{target_row['component_count']} linh kiện theo dõi."
+                )
+            if asset_component_counts:
+                total_components = sum(item["component_count"] for item in asset_component_counts)
+                return f"Hệ thống hiện có {len(asset_component_counts)} tài sản với tổng {total_components} linh kiện theo dõi."
+            return "Chưa có dữ liệu linh kiện trong hệ thống."
         if not asset_risks:
             return "Chưa phát hiện linh kiện thang máy nào trong phạm vi rule MVP cần cảnh báo."
         component_names = ", ".join(str(risk["component_name"]) for risk in asset_risks)
@@ -314,6 +401,19 @@ class ChatService:
     def _extract_asset_code(question: str) -> str | None:
         match = re.search(r"\bELV-[A-Z0-9-]+\b", question.upper())
         return match.group(0) if match else None
+
+    @staticmethod
+    def _pick_asset_component_count(
+        rows: list[dict[str, Any]],
+        requested_asset_code: str | None,
+    ) -> dict[str, Any] | None:
+        if not rows:
+            return None
+        if requested_asset_code:
+            for row in rows:
+                if row["asset_code"] == requested_asset_code:
+                    return row
+        return None
 
     def _get_ontology_context(self, asset_code: str | None) -> dict[str, Any]:
         if not asset_code:

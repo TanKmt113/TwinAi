@@ -14,6 +14,39 @@ type ManualChatPanelProps = {
   manuals: Manual[];
 };
 
+/** Maps API `agent_mode` to a short label so operators see whether Gemini/OpenAI was invoked. */
+function describeLlmUsage(agentMode: string | undefined): { headline: string; detail: string } {
+  if (!agentMode) {
+    return { headline: "Chưa rõ", detail: "Thiếu agent_mode từ API." };
+  }
+  if (agentMode.startsWith("llm_tool_agent:")) {
+    const provider = agentMode.slice("llm_tool_agent:".length);
+    return {
+      headline: `LLM đang bật (${provider})`,
+      detail: "Kết luận được tạo qua LLM trên TOOL_CONTEXT (Gemini/OpenAI).",
+    };
+  }
+  if (agentMode === "rule_fallback_no_llm_key") {
+    return {
+      headline: "Không gọi LLM",
+      detail: "Thiếu API key hoặc provider chưa cấu hình — chỉ rule/template.",
+    };
+  }
+  if (agentMode === "rule_fallback_after_llm_error") {
+    return {
+      headline: "LLM lỗi — fallback rule",
+      detail: "Gọi LLM thất bại; hệ thống dùng rule fallback.",
+    };
+  }
+  if (agentMode === "guardrail_out_of_scope") {
+    return {
+      headline: "Không gọi LLM (guardrail)",
+      detail: "Câu hỏi ngoài phạm vi ontology — không gọi model.",
+    };
+  }
+  return { headline: "Chế độ khác", detail: agentMode };
+}
+
 export function ManualChatPanel({ manuals }: ManualChatPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedManual, setUploadedManual] = useState<Manual | null>(null);
@@ -107,7 +140,17 @@ export function ManualChatPanel({ manuals }: ManualChatPanelProps) {
             </div>
           ) : null}
         </div>
-        {chunks.length ? <p className="muted">{chunks.length} chunk đã parse trong phiên này.</p> : null}
+        {chunks.length ? (
+          <div className="list-stack compact">
+            <p className="muted">{chunks.length} chunk đã parse trong phiên này.</p>
+            {chunks.slice(0, 3).map((chunk) => (
+              <div className="list-item vertical" key={chunk.id}>
+                <strong>Chunk {chunk.chunk_index}</strong>
+                <span>{chunk.chunk_text.slice(0, 180)}...</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="chat-box">
@@ -135,12 +178,18 @@ export function ManualChatPanel({ manuals }: ManualChatPanelProps) {
 
 function ChatAnswer({ answer }: { answer: ChatResponse }) {
   const toolCalls = answer.tool_calls ?? [];
+  const llm = describeLlmUsage(answer.agent_mode);
+  const llmOk = answer.agent_mode?.startsWith("llm_tool_agent:") ?? false;
 
   return (
     <div className="chat-answer">
+      <div className={`chat-llm-status${llmOk ? " chat-llm-status--ok" : ""}`}>
+        <strong>{llm.headline}</strong>
+        <span>{llm.detail}</span>
+      </div>
       <strong>{answer.conclusion}</strong>
       <span>Intent: {answer.intent}</span>
-      <span>Agent: {answer.agent_mode ?? "unknown"}</span>
+      <span className="chat-agent-raw">agent_mode: {answer.agent_mode ?? "unknown"}</span>
       <div>
         <p className="mini-heading">Tool calls</p>
         <ul>
@@ -157,6 +206,24 @@ function ChatAnswer({ answer }: { answer: ChatResponse }) {
             <li key={item}>{item}</li>
           ))}
           {!answer.evidence.length ? <li>Không có evidence.</li> : null}
+        </ul>
+      </div>
+      <div>
+        <p className="mini-heading">Recommended actions</p>
+        <ul>
+          {answer.recommended_actions.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          {!answer.recommended_actions.length ? <li>Không có hành động đề xuất.</li> : null}
+        </ul>
+      </div>
+      <div>
+        <p className="mini-heading">Missing data</p>
+        <ul>
+          {answer.missing_data.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          {!answer.missing_data.length ? <li>Không thiếu dữ liệu quan trọng.</li> : null}
         </ul>
       </div>
       <div>

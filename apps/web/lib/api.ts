@@ -4,6 +4,20 @@ export type HealthResponse = {
   version: string;
 };
 
+export type ServiceHealthEntry = {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  optional?: boolean;
+};
+
+export type SystemServicesResponse = {
+  overall: "ok" | "degraded" | "critical" | "unknown";
+  checked_at: string;
+  services: ServiceHealthEntry[];
+};
+
 export type Component = {
   id: string;
   code: string;
@@ -41,12 +55,76 @@ export type InspectionTask = {
 
 export type PurchaseRequest = {
   id: string;
+  component_id: string;
+  inventory_item_id: string;
+  rule_id: string | null;
   reason: string;
   quantity_requested: number;
   status: string;
   approval_policy_code: string | null;
   final_approver: string | null;
   created_by_agent: boolean;
+  created_at: string;
+};
+
+export type PurchaseRequestDetail = PurchaseRequest & {
+  asset_id: string | null;
+  asset_code: string | null;
+  component_code: string | null;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  actor_type: string;
+  actor_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  before_json: Record<string, unknown> | null;
+  after_json: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+};
+
+export type OrgUserBrief = {
+  user_code: string;
+  full_name: string;
+  email: string;
+  job_title: string | null;
+  role_tags: string[];
+};
+
+export type AssetContacts = {
+  asset_id: string;
+  asset_code: string;
+  asset_name: string;
+  department_owner: string | null;
+  primary_contact: OrgUserBrief | null;
+  backup_contact: OrgUserBrief | null;
+  escalation_policy_code: string | null;
+  escalation_policy_name: string | null;
+};
+
+export type RuleNotificationTargets = {
+  rule_id: string;
+  rule_code: string;
+  rule_name: string;
+  suggested_approvers: OrgUserBrief[];
+  suggested_operational_contacts: OrgUserBrief[];
+  escalation_policy: { code: string; name: string; config: Record<string, unknown> } | null;
+};
+
+export type EscalationPolicyDetail = {
+  id: string;
+  code: string;
+  name: string;
+  config: Record<string, unknown>;
+};
+
+export type WorkflowActorBody = {
+  actor_type?: string;
+  actor_id?: string;
+  note?: string | null;
 };
 
 export type AgentRun = {
@@ -113,15 +191,26 @@ const fallbackHealth: HealthResponse = {
   version: "unknown",
 };
 
+const fallbackSystemServices: SystemServicesResponse = {
+  overall: "unknown",
+  checked_at: "",
+  services: [],
+};
+
 const serverBaseUrl = process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function getApiHealth(): Promise<HealthResponse> {
   return getServerJson<HealthResponse>("/health", fallbackHealth);
 }
 
+export async function getSystemServicesHealth(): Promise<SystemServicesResponse> {
+  return getServerJson<SystemServicesResponse>("/health/services", fallbackSystemServices);
+}
+
 export async function getDashboardData() {
-  const [health, apiAssets, tasks, purchaseRequests, agentRuns, manuals] = await Promise.all([
+  const [health, systemServices, apiAssets, tasks, purchaseRequests, agentRuns, manuals] = await Promise.all([
     getApiHealth(),
+    getSystemServicesHealth(),
     getServerJson<ApiAsset[]>("/api/assets", []),
     getServerJson<InspectionTask[]>("/api/inspection-tasks", []),
     getServerJson<PurchaseRequest[]>("/api/purchase-requests", []),
@@ -135,6 +224,7 @@ export async function getDashboardData() {
 
   return {
     health,
+    systemServices,
     assets,
     tasks,
     purchaseRequests,
@@ -210,6 +300,95 @@ export async function queryChatFromBrowser(question: string): Promise<ChatRespon
   }
 
   return response.json();
+}
+
+async function postPurchaseWorkflowAction(
+  requestId: string,
+  action: "submit" | "approve" | "reject" | "cancel",
+  body: WorkflowActorBody,
+): Promise<PurchaseRequest> {
+  const response = await fetch(`/api/backend/api/purchase-requests/${requestId}/${action}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      actor_type: body.actor_type ?? "user",
+      actor_id: body.actor_id ?? "demo_user",
+      note: body.note ?? null,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${action} thất bại (${response.status}): ${detail}`);
+  }
+  return response.json();
+}
+
+export function submitPurchaseRequestFromBrowser(requestId: string, body: WorkflowActorBody = {}) {
+  return postPurchaseWorkflowAction(requestId, "submit", body);
+}
+
+export function approvePurchaseRequestFromBrowser(requestId: string, body: WorkflowActorBody = {}) {
+  return postPurchaseWorkflowAction(requestId, "approve", body);
+}
+
+export function rejectPurchaseRequestFromBrowser(requestId: string, body: WorkflowActorBody = {}) {
+  return postPurchaseWorkflowAction(requestId, "reject", body);
+}
+
+export function cancelPurchaseRequestFromBrowser(requestId: string, body: WorkflowActorBody = {}) {
+  return postPurchaseWorkflowAction(requestId, "cancel", body);
+}
+
+export async function fetchPurchaseRequestDetailFromServer(id: string): Promise<PurchaseRequestDetail | null> {
+  return getServerJsonStrict<PurchaseRequestDetail>(`/api/purchase-requests/${encodeURIComponent(id)}`);
+}
+
+export async function fetchAuditLogsFromServer(params?: {
+  entityType?: string;
+  entityId?: string;
+  limit?: number;
+}): Promise<AuditLogEntry[]> {
+  const q = new URLSearchParams();
+  if (params?.entityType) {
+    q.set("entity_type", params.entityType);
+  }
+  if (params?.entityId) {
+    q.set("entity_id", params.entityId);
+  }
+  if (params?.limit) {
+    q.set("limit", String(params.limit));
+  }
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  const rows = await getServerJsonStrict<AuditLogEntry[]>(`/api/audit-logs${suffix}`);
+  return rows ?? [];
+}
+
+export async function fetchAssetContactsFromServer(assetId: string): Promise<AssetContacts | null> {
+  return getServerJsonStrict<AssetContacts>(`/api/assets/${encodeURIComponent(assetId)}/contacts`);
+}
+
+export async function fetchRuleNotificationTargetsFromServer(ruleId: string): Promise<RuleNotificationTargets | null> {
+  return getServerJsonStrict<RuleNotificationTargets>(
+    `/api/rules/${encodeURIComponent(ruleId)}/notification-targets`,
+  );
+}
+
+export async function fetchEscalationPolicyFromServer(idOrCode: string): Promise<EscalationPolicyDetail | null> {
+  return getServerJsonStrict<EscalationPolicyDetail>(
+    `/api/escalation-policies/${encodeURIComponent(idOrCode)}`,
+  );
+}
+
+async function getServerJsonStrict<T>(path: string): Promise<T | null> {
+  try {
+    const response = await fetch(`${serverBaseUrl}${path}`, { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+    return response.json() as Promise<T>;
+  } catch {
+    return null;
+  }
 }
 
 async function getServerJson<T>(path: string, fallback: T): Promise<T> {

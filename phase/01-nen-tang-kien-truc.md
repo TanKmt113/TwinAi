@@ -111,6 +111,13 @@ minio
 n8n
 ```
 
+Ghi chú trạng thái hiện tại:
+
+- Backend, Postgres, Neo4j, MinIO, n8n đã có trong `docker-compose.yml`.
+- Frontend hiện có code Next.js nhưng service frontend chưa được bật mặc định trong `docker-compose.yml`.
+- Worker mới ở mức placeholder, chưa có workflow background riêng.
+- MinIO ở phase này mới là placeholder cho storage; luồng upload object thật sẽ hoàn thiện ở phase sau.
+
 ## Deliverables
 
 - Repo scaffold đầy đủ.
@@ -128,7 +135,7 @@ Phase 01 đạt khi:
 1. Chạy được toàn bộ stack bằng Docker Compose.
 2. Backend kết nối được PostgreSQL.
 3. Backend kết nối được Neo4j.
-4. Frontend hiển thị trạng thái hệ thống.
+4. Frontend hiển thị trạng thái hệ thống khi chạy riêng hoặc được bật thêm trong compose.
 5. Neo4j đã có constraints cơ bản nhưng chưa cần seed graph đầy đủ.
 
 ## Rủi ro

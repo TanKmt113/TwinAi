@@ -102,7 +102,7 @@ Phase 2 đã thêm:
 
 ## Phase tiếp theo
 
-Phase 05 sẽ thêm approval UI, notification qua n8n và audit log viewer.
+Phase 05 sẽ thêm approval UI, org routing/escalation, notification qua n8n và audit log viewer. Phần này hiện mới ở mức tài liệu thiết kế, chưa có code backend/frontend tương ứng.
 
 ## Digital Twin mở rộng
 

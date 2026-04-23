@@ -107,10 +107,20 @@ class ReasoningRepository:
         self.db.flush()
         return request
 
-    def add_audit(self, action: str, entity_type: str, entity_id: str, reason: str, after: dict | None = None) -> AuditLog:
+    def add_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        reason: str,
+        after: dict | None = None,
+        *,
+        actor_type: str = "agent",
+        actor_id: str | None = "reasoning_engine",
+    ) -> AuditLog:
         audit = AuditLog(
-            actor_type="agent",
-            actor_id="reasoning_engine",
+            actor_type=actor_type,
+            actor_id=actor_id,
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,

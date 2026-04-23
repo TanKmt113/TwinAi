@@ -14,6 +14,7 @@ Chia hệ thống MVP Agentic AI Ontology thành các giai đoạn phát triển
 6. Không tự động gửi đơn mua hàng thật trong MVP.
 7. Realtime sensor đi trước mô phỏng 3D; 3D phải phản ánh trạng thái twin thật, không chỉ là hình minh họa.
 8. Sensor data phải có timestamp, quality và mapping rõ tới Asset/Component.
+9. Ontology phải mô hình hóa được cả "ai phê duyệt" và "khi có sự cố thì cần báo cho ai/escalate cho ai".
 
 ## Roadmap tổng quát
 
@@ -23,7 +24,7 @@ Chia hệ thống MVP Agentic AI Ontology thành các giai đoạn phát triển
 | 02 | Data + Neo4j + Rule Engine | Seed dữ liệu, tạo graph Ontology, chạy rule `R-ELV-CABLE-001` |
 | 03 | Dashboard + Ontology Map | Xây UI quản trị, dashboard và bản đồ Ontology |
 | 04 | Manual + RAG + Chat | Upload manual, embedding, hỏi đáp có citations |
-| 05 | Approval + Notification + Audit | Phê duyệt, n8n notification, audit log viewer |
+| 05 | Approval + Org Routing + Notification + Audit | Phê duyệt, org routing/escalation, n8n notification, audit log viewer |
 | 06 | Nghiệm thu MVP | Chạy kịch bản demo cuối cùng |
 | 07 | Realtime Sensor + Telemetry | Thêm sensor, sensor readings, API ingest và realtime dashboard cơ bản |
 | 08 | Realtime Rule Engine | Chạy rule từ sensor, tạo sensor alert, sync Sensor/SensorAlert vào Neo4j |
@@ -37,10 +38,12 @@ Thang máy Calidas 1
   -> Cáp kéo còn 5 tháng
   -> Rule R-ELV-CABLE-001 được kích hoạt
   -> Tạo task kiểm tra
+  -> Xác định primary contact và backup contact
   -> Tồn kho cáp = 0
   -> Lead time = 7 tháng
   -> Tạo purchase request draft
   -> Người phê duyệt cuối = CEO
+  -> Notification Agent biết phải báo cho ai
   -> Chat trả lời có căn cứ
 ```
 
@@ -68,7 +71,7 @@ Trigger: user hỏi chat / bấm chạy suy luận / job định kỳ
   -> Reasoning Agent chạy rule deterministic
   -> Action Agent tạo task hoặc purchase request draft nếu đủ điều kiện
   -> Approval Agent xác định policy và người phê duyệt
-  -> Notification Agent gửi n8n webhook nếu cần
+  -> Notification Agent xác định primary contact / backup contact / escalation path và gửi n8n webhook nếu cần
   -> Response Agent dùng LLM để tổng hợp JSON có căn cứ
 ```
 
@@ -98,8 +101,9 @@ MVP được xem là đạt khi người dùng có thể:
 5. Xem purchase request draft.
 6. Xem ontology map.
 7. Hỏi bằng tiếng Việt và nhận câu trả lời có căn cứ.
-8. Phê duyệt hoặc từ chối purchase request.
-9. Xem audit log cho toàn bộ hành động.
+8. Biết sự cố hoặc task mới sẽ báo cho ai đầu tiên.
+9. Phê duyệt hoặc từ chối purchase request.
+10. Xem audit log cho toàn bộ hành động.
 
 Digital Twin mở rộng được xem là đạt khi người dùng có thể:
 

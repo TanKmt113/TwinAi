@@ -82,3 +82,25 @@ def test_chat_agent_blocks_out_of_scope_questions() -> None:
         assert response.agent_mode == "guardrail_out_of_scope"
         assert response.citations == []
         assert "Không đủ dữ liệu" in response.conclusion
+
+
+def test_chat_agent_counts_components_instead_of_falling_back_to_risk_query() -> None:
+    with _session() as db:
+        seed_phase_two_data(db)
+
+        response = ChatService(db).answer("Thang máy ELV-CALIDAS-01 có bao nhiêu linh kiện?")
+
+        assert response.intent == "asset_component_count_query"
+        assert response.agent_mode == "rule_fallback_no_llm_key"
+        assert "1 linh kiện" in response.conclusion
+        assert "ELV-CALIDAS-01" in response.conclusion
+        assert any("Danh sách linh kiện" in item for item in response.evidence)
+        assert response.citations == []
+        assert response.tool_calls == [
+            "classify_intent",
+            "get_asset_component_counts",
+            "get_asset_ontology",
+        ]
+        assert response.recommended_actions == [
+            "Xem chi tiết asset để kiểm tra danh sách linh kiện và trạng thái hiện tại nếu cần."
+        ]

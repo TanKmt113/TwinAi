@@ -6,6 +6,7 @@
 GET /
 GET /health
 GET /health/dependencies
+GET /health/services
 ```
 
 ## Phase 2
@@ -54,6 +55,46 @@ GET  /api/manuals/{manual_id}/chunks
 POST /api/chat/query
 GET  /api/llm/health
 ```
+
+## Organization (đọc — bổ sung trước Phase 05 đầy đủ)
+
+```text
+GET  /api/org/units
+GET  /api/org/users
+```
+
+- `OrgUnitRead`: `id`, `code`, `name`, `level_kind` (`holding` | `branch` | `department` | `team`), `parent_id`, `sort_order`.
+- `OrgUserRead`: `user_code`, `full_name`, `email`, `job_title`, `org_unit_id`, `org_unit_code`, `org_unit_name`, `manager_user_id`, `manager_user_code`, `role_tags`, `is_active`.
+
+Dữ liệu demo từ `seed_phase_two_data` (idempotent). Chat/reasoning **chưa** tự resolve approver/contact từ các bảng này.
+
+## Phase 05 Approval + Org Routing + Notification + Audit
+
+Backend đã có các endpoint sau. Web gọi qua proxy `POST /api/backend/api/...` (xem mục Frontend proxy).
+
+- Sau khi commit transaction chính (submit/approve/reject), backend gọi webhook n8n (`N8N_WEBHOOK_URL`); lỗi gửi webhook không rollback DB và được ghi audit `notification_failed` khi áp dụng.
+
+```text
+GET  /api/purchase-requests
+GET  /api/purchase-requests/{request_id}
+POST /api/purchase-requests/{request_id}/submit
+POST /api/purchase-requests/{request_id}/approve
+POST /api/purchase-requests/{request_id}/reject
+POST /api/purchase-requests/{request_id}/cancel
+
+GET  /api/assets/{asset_id}/contacts
+GET  /api/rules/{rule_id}/notification-targets
+GET  /api/escalation-policies/{policy_id}
+
+GET  /api/audit-logs
+GET  /api/audit-logs?entity_type=purchase_request&entity_id={id}
+```
+
+`GET /api/purchase-requests/{request_id}` trả `PurchaseRequestDetailRead` (thêm `asset_id`, `asset_code`, `component_code` cho UI routing).
+
+Body workflow (submit/approve/reject/cancel): `WorkflowActorBody` — `actor_type` (mặc định `user`), `actor_id`, `note` tuỳ chọn.
+
+**PHASE5_WRITE_SECRET (tuỳ chọn):** nếu biến môi trường được set, mọi POST submit/approve/reject/cancel bắt buộc header `X-Phase5-Write-Secret` trùng giá trị. Frontend Next có thể set cùng secret để proxy `/api/backend/...` tự gắn header.
 
 ## Phase 07 Realtime Sensor + Telemetry
 
@@ -109,9 +150,9 @@ GET /api/realtime/assets/{asset_id}/events
 
 ## `GET /api/llm/health`
 
-Kiểm tra backend có gọi được Gemini API thật bằng `GEMINI_API_KEY` hay không.
+Kiểm tra LLM theo `LLM_PROVIDER`: với `gemini` gọi thử `generateContent`; với `openai` gọi thử `GET /v1/models?limit=1`.
 
-Response thành công:
+Response ví dụ (Gemini):
 
 ```json
 {
@@ -142,7 +183,9 @@ Response:
   "evidence": [],
   "recommended_actions": [],
   "missing_data": [],
-  "citations": []
+  "citations": [],
+  "agent_mode": "llm_tool_agent:gemini",
+  "tool_calls": ["classify_intent", "get_asset_risks", "get_asset_ontology"]
 }
 ```
 
@@ -185,3 +228,22 @@ Response:
   ]
 }
 ```
+
+## `GET /health/services`
+
+Kiểm tra **kết nối thực** tới PostgreSQL, Neo4j, MinIO, LLM (theo `LLM_PROVIDER`), và webhook n8n (nếu có). Dùng cho dashboard trạng thái hạ tầng.
+
+Response (rút gọn):
+
+```json
+{
+  "overall": "ok",
+  "checked_at": "2026-04-23T12:00:00+00:00",
+  "services": [
+    { "id": "api", "label": "API (FastAPI)", "ok": true, "detail": "…" },
+    { "id": "postgresql", "label": "PostgreSQL", "ok": true, "detail": "Kết nối OK" }
+  ]
+}
+```
+
+`overall`: `ok` (tất cả dịch vụ `ok`), `degraded` (DB sống nhưng có dịch vụ phụ lỗi), `critical` (PostgreSQL không kết nối được).

@@ -180,6 +180,11 @@ Và hệ thống tạo được:
 - 1 graph relationship purchase request trong Neo4j.
 - audit log đầy đủ.
 
+Ghi chú mở rộng:
+
+- `ApprovalPolicy`, `User`, `Department` ở phase này là phần graph tối thiểu cho approval flow.
+- `Primary contact`, `backup contact`, `EscalationPolicy`, `NotificationGroup` là phần mở rộng của Phase 05, chưa nên xem là deliverable bắt buộc của Phase 02.
+
 ## Rủi ro
 
 | Rủi ro | Cách xử lý |

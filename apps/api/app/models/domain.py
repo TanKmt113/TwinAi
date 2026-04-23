@@ -164,6 +164,67 @@ class AgentRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class OrgUnit(Base):
+    """Đơn vị tổ chức (cây parent → con): tập đoàn, chi nhánh, phòng, đội."""
+
+    __tablename__ = "org_units"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    level_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("org_units.id"), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    parent: Mapped["OrgUnit | None"] = relationship(
+        "OrgUnit",
+        remote_side=[id],
+        back_populates="children",
+    )
+    children: Mapped[list["OrgUnit"]] = relationship(
+        "OrgUnit",
+        back_populates="parent",
+    )
+    members: Mapped[list["OrgUser"]] = relationship(
+        "OrgUser",
+        back_populates="org_unit",
+    )
+
+
+class EscalationPolicy(Base):
+    """Chính sách escalate/SLA thông báo (MVP — seed + đọc qua API Phase 05)."""
+
+    __tablename__ = "escalation_policies"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    config_json: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
+
+
+class OrgUser(Base):
+    """Người dùng nội bộ gắn đơn vị + quản lý trực tiếp (demo ontology org)."""
+
+    __tablename__ = "org_users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    user_code: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    org_unit_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("org_units.id"), nullable=True)
+    manager_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("org_users.id"), nullable=True)
+    role_tags: Mapped[list[str]] = mapped_column(JSONType, nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    org_unit: Mapped["OrgUnit | None"] = relationship("OrgUnit", back_populates="members")
+    manager: Mapped["OrgUser | None"] = relationship(
+        "OrgUser",
+        remote_side=[id],
+        foreign_keys=[manager_user_id],
+    )
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

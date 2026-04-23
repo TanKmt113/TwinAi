@@ -1,25 +1,22 @@
-import hashlib
 import re
+from math import sqrt
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, text
+from sqlalchemy.exc import DataError
 from sqlalchemy.orm import Session
 
 from app.models import Manual, ManualChunk, Rule
+from app.services.document_parser import DocumentParseError, parse_document
+from app.services.embeddings import EmbeddingClient, EmbeddingError
 from app.services.neo4j_sync import Neo4jSyncService
-
-
-DEFAULT_MANUAL_TEXT = """
-Manual bảo trì thang máy Calidas.
-Kiểm tra cáp kéo định kỳ. Khi cáp kéo còn dưới hoặc bằng 6 tháng tuổi thọ, bộ phận kỹ thuật phải tạo task kiểm tra.
-Kỹ thuật viên cần đo đường kính cáp, đo độ rung khi vận hành, kiểm tra ngày bảo trì gần nhất và ghi nhận đánh giá thực tế.
-Nếu phụ tùng thay thế không có trong kho và lead time mua hàng dài hơn thời gian còn lại của linh kiện, hệ thống được phép tạo đề xuất mua hàng.
-Đề xuất mua hàng không phải đơn mua hàng chính thức và cần người có thẩm quyền phê duyệt.
-"""
+from app.services.object_storage import MinioStorageService
 
 
 class RagService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.embedding_client = EmbeddingClient()
+        self.storage = MinioStorageService()
 
     def list_manuals(self) -> list[Manual]:
         return list(self.db.scalars(select(Manual).order_by(Manual.created_at.desc())))
@@ -34,15 +31,18 @@ class RagService:
         code: str | None = None,
         title: str | None = None,
         rule_code: str | None = "R-ELV-CABLE-001",
+        content_type: str | None = None,
     ) -> Manual:
         manual_code = code or self._code_from_file(file_name)
+        file_object_key = f"manuals/{manual_code}/{file_name}"
+        self.storage.upload_bytes(file_object_key, content, content_type=content_type)
         manual = self.db.scalar(select(Manual).where(Manual.code == manual_code))
         if not manual:
             manual = Manual(
                 code=manual_code,
                 title=title or file_name,
                 department_owner="Kỹ thuật",
-                file_object_key=f"manuals/{manual_code}/{file_name}",
+                file_object_key=file_object_key,
                 file_name=file_name,
                 file_type=file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt",
                 version="uploaded",
@@ -50,10 +50,15 @@ class RagService:
             )
             self.db.add(manual)
             self.db.flush()
+        else:
+            manual.title = title or file_name
+            manual.file_object_key = file_object_key
+            manual.file_name = file_name
+            manual.file_type = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
+            manual.version = "uploaded"
+            manual.status = "uploaded"
+            self.db.execute(delete(ManualChunk).where(ManualChunk.manual_id == manual.id))
 
-        text = self._decode_content(content)
-        if text.strip():
-            self.create_chunks(manual, text)
         if rule_code:
             self.link_manual_to_rule(manual, rule_code)
         self.db.commit()
@@ -83,23 +88,32 @@ class RagService:
         existing = self.list_chunks(manual.id)
         if existing:
             return existing
-        return self.create_chunks(manual, DEFAULT_MANUAL_TEXT)
+        raw_content = self.storage.download_bytes(manual.file_object_key)
+        parsed_text = parse_document(raw_content, file_name=manual.file_name, file_type=manual.file_type)
+        if not parsed_text.strip():
+            raise DocumentParseError("Manual không có nội dung text để parse.")
+        return self.create_chunks(manual, parsed_text)
 
     def create_chunks(self, manual: Manual, text: str) -> list[ManualChunk]:
+        if not self.embedding_client.is_configured():
+            raise EmbeddingError("Cần cấu hình GEMINI_API_KEY hoặc OPENAI_API_KEY để tạo embedding thật cho manual.")
+
         self.db.execute(delete(ManualChunk).where(ManualChunk.manual_id == manual.id))
+        chunk_texts = _chunk_text(text)
+        embeddings = self.embedding_client.embed_documents(chunk_texts)
         chunks = []
-        for index, chunk_text in enumerate(_chunk_text(text), start=1):
+        for index, (chunk_text, embedding) in enumerate(zip(chunk_texts, embeddings, strict=True), start=1):
             chunk = ManualChunk(
                 manual_id=manual.id,
                 chunk_index=index,
                 heading=manual.title,
                 page_number=None,
                 chunk_text=chunk_text,
-                embedding_json=_fake_embedding(chunk_text),
+                embedding_json=embedding,
                 metadata_json={
                     "manual_code": manual.code,
                     "manual_title": manual.title,
-                    "source": "uploaded_or_seed_manual",
+                    "source": "minio_uploaded_manual",
                 },
             )
             self.db.add(chunk)
@@ -119,29 +133,84 @@ class RagService:
         )
 
     def search_chunks(self, query: str, limit: int = 5) -> list[ManualChunk]:
+        chunks = list(self.db.scalars(select(ManualChunk).order_by(ManualChunk.chunk_index)))
+        if not chunks:
+            return []
+
+        if self.embedding_client.is_configured():
+            try:
+                query_embedding = self.embedding_client.embed_query(query)
+                if self.db.bind and self.db.bind.dialect.name == "postgresql":
+                    rows = self._search_chunks_postgres(query_embedding=query_embedding, limit=limit)
+                    if rows:
+                        return rows
+                return self._search_chunks_python(
+                    chunks=chunks, query_embedding=query_embedding, limit=limit
+                )
+            except EmbeddingError:
+                pass
+
         terms = [term for term in re.split(r"\W+", query.lower()) if len(term) >= 3]
         if not terms:
-            return list(self.db.scalars(select(ManualChunk).order_by(ManualChunk.chunk_index).limit(limit)))
+            return chunks[:limit]
 
         filters = [ManualChunk.chunk_text.ilike(f"%{term}%") for term in terms[:6]]
         rows = list(self.db.scalars(select(ManualChunk).where(or_(*filters)).limit(limit)))
         if rows:
             return rows
-        return list(self.db.scalars(select(ManualChunk).order_by(ManualChunk.chunk_index).limit(limit)))
-
-    @staticmethod
-    def _decode_content(content: bytes) -> str:
-        for encoding in ("utf-8", "utf-16", "latin-1"):
-            try:
-                return content.decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        return ""
+        return chunks[:limit]
 
     @staticmethod
     def _code_from_file(file_name: str) -> str:
         base = re.sub(r"[^A-Za-z0-9]+", "-", file_name.rsplit(".", 1)[0]).strip("-").upper()
         return f"MAN-{base[:40] or 'UPLOAD'}"
+
+    def _search_chunks_postgres(self, query_embedding: list[float], limit: int) -> list[ManualChunk]:
+        """pgvector distance requires query and row vectors to share the same dimension (legacy seed used 8-dim)."""
+        dim = len(query_embedding)
+        if dim == 0:
+            return []
+        embedding_literal = _vector_literal(query_embedding)
+        try:
+            rows = self.db.execute(
+                text(
+                    """
+                    SELECT id
+                    FROM manual_chunks
+                    WHERE embedding_json IS NOT NULL
+                      AND jsonb_array_length(embedding_json::jsonb) = :embedding_dim
+                    ORDER BY CAST(embedding_json::text AS vector) <=> CAST(:query_embedding AS vector)
+                    LIMIT :limit
+                    """
+                ),
+                {"query_embedding": embedding_literal, "limit": limit, "embedding_dim": dim},
+            ).fetchall()
+        except DataError:
+            return []
+        chunk_ids = [row[0] for row in rows]
+        if not chunk_ids:
+            return []
+        by_id = {
+            chunk.id: chunk
+            for chunk in self.db.scalars(select(ManualChunk).where(ManualChunk.id.in_(chunk_ids)))
+        }
+        return [by_id[chunk_id] for chunk_id in chunk_ids if chunk_id in by_id]
+
+    @staticmethod
+    def _search_chunks_python(chunks: list[ManualChunk], query_embedding: list[float], limit: int) -> list[ManualChunk]:
+        dim = len(query_embedding)
+        ranked = sorted(
+            (
+                (chunk, _cosine_similarity(chunk.embedding_json, query_embedding))
+                for chunk in chunks
+                if chunk.embedding_json
+                and isinstance(chunk.embedding_json, list)
+                and len(chunk.embedding_json) == dim
+            ),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        return [chunk for chunk, _ in ranked[:limit]]
 
 
 def _chunk_text(text: str, max_chars: int = 700) -> list[str]:
@@ -159,6 +228,16 @@ def _chunk_text(text: str, max_chars: int = 700) -> list[str]:
     return chunks or [text[:max_chars]]
 
 
-def _fake_embedding(text: str, dimensions: int = 8) -> list[float]:
-    digest = hashlib.sha256(text.encode("utf-8")).digest()
-    return [round(byte / 255, 4) for byte in digest[:dimensions]]
+def _vector_literal(vector: list[float]) -> str:
+    return "[" + ",".join(f"{value:.8f}" for value in vector) + "]"
+
+
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    numerator = sum(a * b for a, b in zip(left, right, strict=True))
+    left_norm = sqrt(sum(a * a for a in left))
+    right_norm = sqrt(sum(b * b for b in right))
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+    return numerator / (left_norm * right_norm)

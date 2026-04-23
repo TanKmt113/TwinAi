@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import AgentRun, InspectionTask, PurchaseRequest
-from app.schemas import AgentRunRead, InspectionTaskRead, PurchaseRequestRead, ReasoningRunResponse
+from app.models import AgentRun, InspectionTask
+from app.schemas import AgentRunRead, InspectionTaskRead, ReasoningRunResponse
 from app.services.reasoning import ReasoningEngine
 
 router = APIRouter(prefix="/api", tags=["reasoning"])
@@ -33,6 +33,3 @@ def list_tasks(db: Session = Depends(get_db)) -> list[InspectionTask]:
     return list(db.scalars(select(InspectionTask).order_by(InspectionTask.created_at.desc())))
 
 
-@router.get("/purchase-requests", response_model=list[PurchaseRequestRead])
-def list_purchase_requests(db: Session = Depends(get_db)) -> list[PurchaseRequest]:
-    return list(db.scalars(select(PurchaseRequest).order_by(PurchaseRequest.created_at.desc())))

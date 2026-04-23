@@ -1,10 +1,11 @@
 # Architecture
 
-Phase 4 có dashboard vận hành, Ontology map, upload/parse manual, Chat/RAG có citations và chat agent có tool context. Phase 07-10 mở rộng hệ thống thành Digital Twin realtime với sensor telemetry và mô phỏng 3D. Lớp Agentic AI phải được hiểu là workflow có guardrail, không phải một chatbot tự quyết định nghiệp vụ.
+Phase 4 trong code hiện tại đã có dashboard vận hành (kèm panel **Trạng thái hạ tầng** từ `GET /health/services`), Ontology map MVP, upload/parse manual, Chat/RAG có citations và chat agent có tool context. PostgreSQL có thêm **`org_units`** / **`org_users`** (cây đơn vị + người dùng nội bộ, seed demo) và **`GET /api/org/units`**, **`GET /api/org/users`** — chưa nối vào luồng phê duyệt hay chat. RAG/pgvector: truy vấn vector chỉ trên chunk cùng số chiều với embedding query để tránh xung đột dữ liệu cũ. Các phần approval workflow đầy đủ, org routing/escalation tự động từ org tables, telemetry và 3D Twin trong sơ đồ bên dưới vẫn là kiến trúc mục tiêu cho các phase tiếp theo. Lớp Agentic AI phải được hiểu là workflow có guardrail, không phải một chatbot tự quyết định nghiệp vụ.
 
 ## Tổng quan hệ thống
 
 ```text
+[Sơ đồ kiến trúc mục tiêu theo roadmap; repo hiện tại mới implement chủ yếu Phase 01-04]
 ┌─────────────────────────────────────────────────────────────┐
 │                         Next.js UI                          │
 │ Dashboard | Ontology Map | Chat | Task | Purchase | 3D Twin  │
@@ -34,14 +35,15 @@ Phase 4 có dashboard vận hành, Ontology map, upload/parse manual, Chat/RAG c
 │  - căn cứ kỹ thuật            - không auto approve            │
 │                                                             │
 │  Approval Agent ────────────▶ Notification Agent             │
-│  - tìm policy/approver        - gửi n8n webhook               │
-│  - human gate                 - ghi sent/failed               │
+│  - tìm policy/approver        - route theo contact/escalation  │
+│  - human gate                 - gửi n8n webhook, ghi sent/failed│
 └──────────────────────────────┬──────────────────────────────┘
                                │ tool calls / state / audit
 ┌──────────────────────────────▼──────────────────────────────┐
 │                    Backend Domain Services                  │
 │ Ontology Service | Rule Engine | RAG Service | Purchase API  │
-│ Approval | Audit | Notification | Telemetry | Realtime Rules │
+│ Approval | Org Routing | Audit | Notification | Telemetry    │
+│ Realtime Rules                                               │
 └──────────────┬───────────────┬───────────────┬──────────────┘
                │               │               │
 ┌──────────────▼───┐   ┌───────▼────────┐  ┌───▼──────────────┐
@@ -85,7 +87,7 @@ Agent Orchestrator
        ▼
 Ontology Agent
   -> tool: get_asset_ontology(asset_code)
-  -> đọc Neo4j: Asset -> Component -> Rule -> Manual -> Inventory -> Approval
+  -> đọc Neo4j: Asset -> Component -> Rule -> Manual -> Inventory -> Approval -> Org Routing
        │
        ▼
 RAG Agent
@@ -112,13 +114,27 @@ Approval Agent
        │
        ▼
 Notification Agent
-  -> tool: send_n8n_webhook(event)
+  -> tool: get_notification_targets(asset_code, severity, event_type)
+  -> route theo primary_contact, backup_contact, notification_group, escalation_policy
+  -> send_n8n_webhook(event)
   -> gửi email/chat/ticket/ERP bridge
   -> ghi notification_sent hoặc notification_failed
        │
        ▼
 Response Agent
   -> LLM tổng hợp JSON: conclusion, evidence, recommended_actions, missing_data, citations
+```
+
+## Tổ chức và escalation workflow
+
+```text
+Rule hoặc Alert được kích hoạt
+  -> Ontology Agent lấy Asset owner, primary_contact, backup_contact
+  -> Approval Agent xác định người có quyền phê duyệt nếu có purchase flow
+  -> Notification Agent lấy escalation policy và notification group
+  -> gửi thông báo cho người xử lý đầu tiên
+  -> nếu quá SLA hoặc chưa acknowledge thì escalate lên cấp tiếp theo
+  -> mọi bước gửi/escalate đều ghi audit log và notification event
 ```
 
 ## Digital Twin realtime workflow
@@ -147,7 +163,7 @@ Sensor / Simulator / MQTT Gateway
 | Reasoning Agent | Không | Chạy rule deterministic, không dựa vào suy đoán LLM |
 | Action Agent | Không | Tạo task/purchase request draft theo rule được phép |
 | Approval Agent | Không | Xác định policy, approver và human gate |
-| Notification Agent | Không | Gửi n8n webhook và ghi trạng thái gửi |
+| Notification Agent | Không | Chọn người nhận theo contact/escalation, gửi n8n webhook và ghi trạng thái gửi |
 | Telemetry Agent | Không | Nhận sensor reading, chuẩn hóa metric và lưu time-series |
 | Realtime Rule Agent | Không | Chạy rule threshold/window từ sensor, tạo SensorAlert |
 
@@ -167,6 +183,7 @@ Sensor / Simulator / MQTT Gateway
 - `postgres`: dữ liệu giao dịch, audit, pgvector, agent runs/events, sensor readings MVP.
 - `timescale`: lựa chọn nâng cấp cho sensor readings khi telemetry nhiều.
 - `neo4j`: Ontology graph, quan hệ nghiệp vụ, Sensor/SensorAlert relationship.
+- `org_routing`: lớp domain dùng ontology để chọn người nhận thông báo, owner tài sản và tuyến escalation.
 - `minio`: lưu manual/file gốc.
 - `manual_chunks`: nội dung đã parse/chunk trong PostgreSQL để phục vụ RAG.
 - `llm_agent`: gọi Gemini/OpenAI khi có API key để tổng hợp JSON có guardrail.

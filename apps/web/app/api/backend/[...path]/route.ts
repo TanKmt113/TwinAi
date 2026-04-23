@@ -19,7 +19,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   try {
     response = await fetch(targetUrl, {
       method: request.method,
-      headers: buildHeaders(request),
+      headers: buildHeaders(request, targetPath),
       body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
       cache: "no-store",
     });
@@ -60,11 +60,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
   return proxy(request, context);
 }
 
-function buildHeaders(request: NextRequest) {
+function shouldAttachPhase5WriteSecret(method: string, targetPath: string): boolean {
+  if (method !== "POST") {
+    return false;
+  }
+  return /^api\/purchase-requests\/[^/]+\/(submit|approve|reject|cancel)$/.test(targetPath);
+}
+
+function buildHeaders(request: NextRequest, targetPath: string) {
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) {
     headers.set("content-type", contentType);
+  }
+  const phase5 = process.env.PHASE5_WRITE_SECRET?.trim();
+  if (phase5 && shouldAttachPhase5WriteSecret(request.method, targetPath)) {
+    headers.set("X-Phase5-Write-Secret", phase5);
   }
   return headers;
 }
