@@ -127,6 +127,10 @@ export type AssetContacts = {
   backup_contact: OrgUserBrief | null;
   escalation_policy_code: string | null;
   escalation_policy_name: string | null;
+  contact_resolution?: {
+    primary_source: string;
+    backup_source: string;
+  };
 };
 
 export type RuleNotificationTargets = {

@@ -90,6 +90,8 @@ GET  /api/audit-logs
 GET  /api/audit-logs?entity_type=purchase_request&entity_id={id}
 ```
 
+- `GET /api/assets/{asset_id}/contacts`: ưu tiên `asset_contact_assignments` (`contact_kind` `primary` | `backup`, `sort_order`); không có bản ghi thì fallback `role_tags`. Trả thêm `contact_resolution.primary_source` / `backup_source`: `asset_assignment` | `role_fallback` | `none`.
+
 `GET /api/purchase-requests/{request_id}` trả `PurchaseRequestDetailRead` (thêm `asset_id`, `asset_code`, `component_code` cho UI routing).
 
 Body workflow (submit/approve/reject/cancel): `WorkflowActorBody` — `actor_type` (mặc định `user`), `actor_id`, `note` tuỳ chọn.

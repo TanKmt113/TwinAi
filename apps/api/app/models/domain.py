@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -223,6 +223,21 @@ class OrgUser(Base):
         remote_side=[id],
         foreign_keys=[manager_user_id],
     )
+
+
+class AssetContactAssignment(Base):
+    """Gán liên hệ ưu tiên theo tài sản (primary/backup); resolve trước fallback role_tags."""
+
+    __tablename__ = "asset_contact_assignments"
+    __table_args__ = (
+        UniqueConstraint("asset_id", "contact_kind", "org_user_id", name="uq_asset_contact_kind_user"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    asset_id: Mapped[str] = mapped_column(String(36), ForeignKey("assets.id"), nullable=False, index=True)
+    org_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("org_users.id"), nullable=False, index=True)
+    contact_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class AuditLog(Base):

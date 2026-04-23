@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Asset,
+    AssetContactAssignment,
     AuditLog,
     Component,
     EscalationPolicy,
@@ -31,6 +32,7 @@ def seed_phase_two_data(db: Session) -> None:
     _seed_demo_audit_org_context(db)
     _seed_org_units(db)
     _seed_org_users(db)
+    _seed_asset_contact_assignments(db)
     db.commit()
 
 
@@ -463,6 +465,41 @@ def _seed_org_users(db: Session) -> None:
                 manager_user_id=manager.id if manager else None,
                 role_tags=tags,
                 is_active=True,
+            )
+        )
+        db.flush()
+
+
+def _seed_asset_contact_assignments(db: Session) -> None:
+    """Gán primary/backup theo từng asset (ưu tiên trước fallback role_tags trong build_asset_contacts)."""
+    specs: list[tuple[str, str, str, int]] = [
+        ("ELV-CALIDAS-01", "USR-LEAD-MALL-001", "primary", 0),
+        ("ELV-CALIDAS-01", "USR-TP-OPS-001", "backup", 0),
+        ("ELV-CALIDAS-02", "USR-KTV-001", "primary", 0),
+        ("ELV-CALIDAS-02", "USR-GD-HN-001", "backup", 0),
+        ("ELV-SERVICE-01", "USR-KTV-001", "primary", 0),
+        ("ELV-SERVICE-01", "USR-SAFE-001", "backup", 0),
+    ]
+    for asset_code, user_code, kind, order in specs:
+        asset = db.scalar(select(Asset).where(Asset.code == asset_code))
+        user = db.scalar(select(OrgUser).where(OrgUser.user_code == user_code))
+        if not asset or not user:
+            continue
+        exists = db.scalar(
+            select(AssetContactAssignment).where(
+                AssetContactAssignment.asset_id == asset.id,
+                AssetContactAssignment.contact_kind == kind,
+                AssetContactAssignment.org_user_id == user.id,
+            )
+        )
+        if exists:
+            continue
+        db.add(
+            AssetContactAssignment(
+                asset_id=asset.id,
+                org_user_id=user.id,
+                contact_kind=kind,
+                sort_order=order,
             )
         )
         db.flush()

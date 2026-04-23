@@ -36,6 +36,7 @@ class MinioStorageService:
 
     def download_bytes(self, object_key: str) -> bytes:
         try:
+            self._ensure_bucket()
             response = self.client.get_object(self.bucket, object_key)
             try:
                 return response.read()

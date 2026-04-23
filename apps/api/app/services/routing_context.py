@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Asset, EscalationPolicy, OrgUser, Rule
+from app.models import Asset, AssetContactAssignment, EscalationPolicy, OrgUser, Rule
 
 
 def _active_users_with_any_role(db: Session, roles: set[str]) -> list[OrgUser]:
@@ -20,14 +20,47 @@ def _active_users_with_any_role(db: Session, roles: set[str]) -> list[OrgUser]:
     return picked
 
 
+def _first_assigned_contact(
+    db: Session,
+    asset_id: str,
+    contact_kind: str,
+    *,
+    exclude_user_id: str | None,
+) -> OrgUser | None:
+    stmt = (
+        select(OrgUser)
+        .join(AssetContactAssignment, AssetContactAssignment.org_user_id == OrgUser.id)
+        .where(
+            AssetContactAssignment.asset_id == asset_id,
+            AssetContactAssignment.contact_kind == contact_kind,
+            OrgUser.is_active == True,  # noqa: E712
+        )
+        .order_by(AssetContactAssignment.sort_order, OrgUser.user_code)
+    )
+    for user in db.scalars(stmt):
+        if exclude_user_id and user.id == exclude_user_id:
+            continue
+        return user
+    return None
+
+
 def build_asset_contacts(db: Session, asset: Asset) -> dict[str, Any]:
     primary_roles = {"technician", "field"}
     backup_roles = {"department_head", "team_lead", "branch_head"}
-    primary_candidates = _active_users_with_any_role(db, primary_roles)
-    backup_candidates = _active_users_with_any_role(db, backup_roles)
 
-    primary = primary_candidates[0] if primary_candidates else None
-    backup = next((u for u in backup_candidates if primary is None or u.id != primary.id), None)
+    primary = _first_assigned_contact(db, asset.id, "primary", exclude_user_id=None)
+    primary_source = "asset_assignment" if primary else "role_fallback"
+    if not primary:
+        primary_candidates = _active_users_with_any_role(db, primary_roles)
+        primary = primary_candidates[0] if primary_candidates else None
+        primary_source = "role_fallback" if primary else "none"
+
+    backup = _first_assigned_contact(db, asset.id, "backup", exclude_user_id=primary.id if primary else None)
+    backup_source = "asset_assignment" if backup else "role_fallback"
+    if not backup:
+        backup_candidates = _active_users_with_any_role(db, backup_roles)
+        backup = next((u for u in backup_candidates if primary is None or u.id != primary.id), None)
+        backup_source = "role_fallback" if backup else "none"
 
     policy = db.scalar(select(EscalationPolicy).where(EscalationPolicy.code == "ELV-CABLE-ESCALATION-01"))
 
@@ -40,6 +73,10 @@ def build_asset_contacts(db: Session, asset: Asset) -> dict[str, Any]:
         "backup_contact": _user_brief(backup),
         "escalation_policy_code": policy.code if policy else None,
         "escalation_policy_name": policy.name if policy else None,
+        "contact_resolution": {
+            "primary_source": primary_source,
+            "backup_source": backup_source,
+        },
     }
 
 

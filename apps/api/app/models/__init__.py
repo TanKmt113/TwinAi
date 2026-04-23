@@ -1,6 +1,7 @@
 from app.models.domain import (
     AgentRun,
     Asset,
+    AssetContactAssignment,
     AuditLog,
     Component,
     EscalationPolicy,
@@ -17,6 +18,7 @@ from app.models.domain import (
 __all__ = [
     "AgentRun",
     "Asset",
+    "AssetContactAssignment",
     "AuditLog",
     "Component",
     "EscalationPolicy",
