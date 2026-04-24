@@ -4,13 +4,20 @@
 
 Hoàn thiện vòng vận hành: purchase request được submit, phê duyệt/từ chối, chọn đúng người nhận thông báo/escalation và truy vết đầy đủ.
 
-Ghi chú trạng thái hiện tại:
+## Trạng thái triển khai (đồng bộ với code)
 
-- Repo có purchase request list/draft và audit log từ reasoning; **lifecycle submit / approve / reject**, **audit API**, **routing** (contacts, notification-targets, escalation policy đọc từ DB + seed), và **webhook n8n** sau commit đã có ở backend.
-- **Org (đọc):** `org_units`, `org_users`, `GET /api/org/*`. Luồng purchase workflow dùng `role_tags` / policy seed (ví dụ `ELV-CABLE-ESCALATION-01`) cho routing MVP; chat vẫn có thể chưa resolve hết ngữ cảnh org.
-- Neo4j: sync theo task/request trong workflow; đồng bộ full cây org như graph mục tiêu vẫn là mở rộng sau.
-- **UI:** Workflows (thao tác nhanh + link chi tiết), trang `/purchase-requests/[id]` (tóm tắt, submit/approve/reject/cancel, audit table, JSON contacts + notification targets + escalation), trang `/audit-logs` (lọc `entity_type` / `entity_id`).
-- **Bảo vệ ghi (MVP):** `PHASE5_WRITE_SECRET` + header `X-Phase5-Write-Secret` trên POST workflow; Next proxy tự gắn header nếu cùng biến môi trường.
+- **Purchase lifecycle:** submit / approve / reject / cancel; **phê duyệt 2 cấp** khi `inventory_items.import_required = true` (hàng nhập khẩu): lần approve đầu ghi `first_approved_at` / `first_approved_by`, giữ `waiting_for_approval`; lần hai mới `approved`. Một cấp khi không import.
+- **Audit API:** `GET /api/audit-logs` + lọc theo entity.
+- **Routing (SQL MVP):** `build_asset_contacts` / `build_rule_notification_targets` trong `apps/api/app/services/routing_context.py` — ưu tiên `asset_contact_assignments`, fallback `org_users.role_tags`; cờ `missing_notification_routing` + audit `missing_notification_routing` khi reasoning tạo task/PR mà thiếu primary/backup.
+- **n8n:** `apps/api/app/services/notification_flow.py` — sau mỗi POST webhook ghi audit `notification_sent`, lỗi `notification_failed`, không cấu hình URL `notification_skipped`.
+- **Reasoning:** sau `commit`, `dispatch_pending_notifications` — event `inspection_task_created`, `purchase_request_drafted` (payload có asset/component/request).
+- **Purchase workflow events n8n:** `purchase_request_waiting_for_approval`, `purchase_request_level1_approved`, `purchase_request_approved`, `purchase_request_rejected`, `purchase_request_cancelled` (payload có `first_*` khi có).
+- **Escalation SLA (API):** `POST /api/routing/escalation-check` — so sánh `opened_at` với `acknowledge_minutes` trong policy; `dry_run=false` có thể ghi audit `escalation_triggered`.
+- **Neo4j:** `sync_seed_graph` đồng bộ thêm **OrgUnit / OrgUser** và quan hệ `REPORTS_TO` (đơn vị), `BELONGS_TO`, `REPORTS_TO` (quản lý) — xem `apps/api/app/services/neo4j_sync.py`.
+- **Chat:** tool context có `asset_routing_contacts`, `routing_guardrails` (thiếu routing → `missing_data`).
+- **Auth (MVP):** `POST /api/auth/login` (OrgUser + `password_hash` bcrypt); `AUTH_ENABLED` + `JWT_SECRET`; ghi workflow: header `X-Phase5-Write-Secret` **hoặc** Bearer JWT hợp lệ (`require_phase5_write_access`). Với JWT, approve có kiểm tra role (cấp 1 vs cấp 2) khi gửi kèm Bearer.
+- **Web:** `/login`, lưu `twinai_access_token`; proxy forward `Authorization`; `AuthGate` chuyển `/login?next=` khi `NEXT_PUBLIC_REQUIRE_LOGIN` ≠ `false` (mặc định bật tường đăng nhập); sidebar Đăng nhập / Đăng xuất; purchase workflow gửi Bearer nếu có token.
+- **DB đã tồn tại (Postgres volume cũ):** `apply_postgres_schema_patches` thêm cột `purchase_requests.first_approved_at`, `first_approved_by`, `org_users.password_hash` nếu thiếu; `backfill_null_org_user_passwords` gán mật khẩu demo `demo` (bcrypt) cho user thiếu hash mỗi lần bootstrap.
 
 ## Điều kiện bắt đầu Phase 05 (từ Phase 04)
 
@@ -20,67 +27,57 @@ Phase 04 được coi là đủ để chuyển sang Phase 05 khi: manual upload+
 
 Phase này xử lý:
 
-- Purchase request lifecycle.
-- Approval flow.
-- Org routing cho asset/rule/sự cố.
-- Notification qua n8n.
+- Purchase request lifecycle (kể cả 2 cấp duyệt import).
+- Approval flow + RBAC JWT tùy chọn.
+- Org routing cho asset/rule/sự cố (SQL + seed; graph org trên Neo4j).
+- Notification qua n8n + audit trạng thái gửi.
 - Audit log viewer.
-- Role/permission MVP.
+- Kiểm tra SLA escalate (endpoint).
 
 ## Purchase request lifecycle
 
 ```text
 draft
-  -> waiting_for_approval
-  -> approved
-  -> rejected
-  -> cancelled
+  -> waiting_for_approval   (có thể: sau approve cấp 1 vẫn ở trạng thái này nếu import_required)
+  -> approved | rejected | cancelled
 ```
+
+Cột bổ sung: `first_approved_at`, `first_approved_by` (nullable).
 
 ## Approval logic
 
-Dựa trên dữ liệu giả lập:
-
 ```text
-Nếu mua phụ tùng thang máy nhập khẩu
-  -> phê duyệt cấp 1: Trưởng bộ phận kỹ thuật
-  -> phê duyệt cuối: CEO
+Nếu mua phụ tùng nhập khẩu (import_required)
+  -> phê duyệt cấp 1: role department_head / team_lead / approver / branch_head (khi dùng JWT + AUTH_ENABLED)
+  -> phê duyệt cuối: final_approver / executive
+Nếu không import
+  -> một lần approve -> approved
 ```
+
+Khi không bật JWT, body `WorkflowActorBody` vẫn ghi `actor_id` cho audit; RBAC role chỉ áp khi có Bearer hợp lệ.
 
 ## Org routing và escalation logic
 
-Ontology cần trả lời:
+Ontology MVP (trả lời bằng dữ liệu SQL + policy seed):
 
 ```text
-Asset này thuộc bộ phận nào?
-Primary contact là ai?
-Backup contact là ai?
-Nếu sau 30 phút chưa acknowledge thì escalate cho ai?
-Severity nào cần báo thêm cho quản lý hoặc approver?
+Asset này thuộc bộ phận nào?        -> department_owner + org (tùy seed)
+Primary / Backup contact?            -> asset_contact_assignments rồi fallback role_tags
+SLA acknowledge / escalate?          -> EscalationPolicy.config_json + POST /api/routing/escalation-check
 ```
 
-Graph tổ chức MVP:
+**Lưu ý:** `routing_context` **không** gọi Neo4j để suy luận người nhận; Neo4j dùng đồng bộ và ontology map khác (chat/API `.../ontology`).
 
-```text
-Asset -> Department
-Asset -> Primary Contact
-Asset -> Backup Contact
-Rule -> EscalationPolicy
-Rule -> NotificationGroup
-User -> Department
-User -> ReportsTo -> User
-```
+## API (backend)
 
-## API cần build
-
-**Đã có (đọc org — bổ sung trước timeline đầy đủ Phase 05):**
+**Org (đọc):**
 
 ```text
 GET  /api/org/units
 GET  /api/org/users
 ```
 
-**Đã có trên backend (Phase 05 — API):**
+**Purchase + routing + audit:**
 
 ```text
 GET  /api/purchase-requests
@@ -93,121 +90,111 @@ POST /api/purchase-requests/{request_id}/cancel
 GET  /api/assets/{asset_id}/contacts
 GET  /api/rules/{rule_id}/notification-targets
 GET  /api/escalation-policies/{policy_id}
+POST /api/routing/escalation-check
 
 GET  /api/audit-logs
 GET  /api/audit-logs?entity_type=purchase_request&entity_id={id}
 ```
 
+**Auth (khi AUTH_ENABLED=true):**
+
+```text
+POST /api/auth/login
+```
+
+**Bảo vệ POST workflow:** `require_phase5_write_access` — khớp `X-Phase5-Write-Secret` nếu cấu hình, hoặc JWT hợp lệ khi `AUTH_ENABLED`.
+
 ## n8n notification
 
-Backend gọi n8n webhook khi:
+Envelope gửi đi: `{ "event": "<tên_event>", "payload": { ... } }` (xem `post_n8n_workflow_event`).
 
-- Có task kiểm tra mới.
-- Có purchase request mới.
-- Purchase request chờ duyệt.
-- Purchase request được approve/reject.
-- Có alert cần báo cho primary contact.
-- Có alert quá SLA cần escalate.
+Backend gọi webhook (best-effort, không rollback nghiệp vụ chính) khi gồm:
 
-Payload gợi ý:
+- Tạo task kiểm tra (reasoning): `inspection_task_created`.
+- Tạo purchase draft (reasoning): `purchase_request_drafted`.
+- Submit / cấp 1 / duyệt cuối / reject / cancel (purchase workflow): các event `purchase_request_*` tương ứng.
 
-```json
-{
-  "event": "purchase_request_waiting_for_approval",
-  "request_id": "...",
-  "asset": "Thang máy Calidas 1",
-  "component": "Cáp kéo Calidas 1",
-  "reason": "Còn 5 tháng tuổi thọ, tồn kho = 0, lead time = 7 tháng",
-  "approver": "CEO",
-  "primary_contact": "Kỹ thuật viên trực",
-  "backup_contact": "Trưởng bộ phận kỹ thuật",
-  "escalation_policy": "ELV-CRITICAL-01"
-}
-```
+Payload purchase có thể gồm: `request_id`, `status`, `reason`, `approval_policy_code`, `final_approver`, `first_approved_at`, `first_approved_by`, mã asset/component/inventory (tùy bước).
 
 ## Agentic action flow
 
 ```text
-Reasoning Agent phát hiện rule kích hoạt
-  -> Action Agent tạo inspection task nếu chưa tồn tại
-  -> Action Agent kiểm tra tồn kho và lead time
-  -> Action Agent tạo purchase request draft nếu đủ điều kiện
-  -> Approval Agent xác định approval policy và final approver
-  -> Org Routing Agent lấy primary contact, backup contact, notification group, escalation policy
-  -> Notification Agent gửi n8n webhook cho đúng người nhận khi request chờ duyệt hoặc task mới được tạo
-  -> Audit Service ghi lại toàn bộ hành động
+Reasoning: rule approved + condition_json khớp component
+  -> Tạo inspection task (và audit); nếu thiếu primary/backup -> audit missing_notification_routing
+  -> Đủ điều kiện tồn kho/lead time -> purchase request draft + audit tương tự
+  -> commit DB -> dispatch n8n (task + draft)
+Purchase workflow (người): submit / approve (1 hoặc 2 bước) / reject / cancel -> n8n + audit
+Notification helper -> notification_sent | notification_failed | notification_skipped
 ```
 
-Guardrail:
+## Guardrail
 
 ```text
-Agent chỉ tạo draft.
-Agent không submit request thay người.
-Agent không approve/reject thay người.
-Mọi action phải có audit log.
-Notification failure không rollback dữ liệu chính.
-Không gửi sai đối tượng nếu asset/rule chưa có routing rõ ràng; khi thiếu routing phải báo "không đủ dữ liệu cấu hình".
+Agent chỉ tạo draft; không submit/approve/reject thay người (trừ luồng nghiệp vụ được định nghĩa rõ sau này).
+Notification failure không rollback transaction nghiệp vụ chính.
+Thiếu primary hoặc backup contact -> missing_notification_routing + cờ trong API contacts/chat.
 ```
 
-## Audit log cần ghi
+## Audit log (action điển hình)
 
 ```text
 agent_created_inspection_task
 agent_created_purchase_request
+missing_notification_routing
 user_submitted_purchase_request
+user_approved_purchase_request_level1
 user_approved_purchase_request
 user_rejected_purchase_request
 user_cancelled_purchase_request
 notification_sent
 notification_failed
+notification_skipped
 escalation_triggered
-missing_notification_routing
 ```
 
 ## Role MVP
 
-```text
-admin
-ai_team
-technical_manager
-technician
-warehouse_staff
-purchase_staff
-approver
-viewer
-on_call
-```
+Trên `org_users.role_tags` (seed demo): `technician`, `field`, `department_head`, `team_lead`, `branch_head`, `final_approver`, `executive`, … — dùng cho routing fallback và RBAC approve khi JWT bật. Danh sách role “tài liệu” dài hơn (`admin`, `viewer`, …) có thể bổ sung dần vào seed/API.
 
 ## Deliverables
 
-- Purchase request detail page. **Đã có:** `/purchase-requests/[id]`.
-- Submit/approve/reject/cancel actions. **Đã có:** API + UI (Workflows + detail).
-- Asset contacts / notification targets viewer. **Đã có:** JSON inspect trên trang chi tiết (đọc từ API Phase 05).
-- Escalation policy config hoặc seed dữ liệu org routing. **Đã có:** seed `ELV-CABLE-ESCALATION-01` + block JSON policy trên detail.
-- n8n webhook integration. **Đã có:** backend (sau commit).
-- Audit log table. **Đã có:** `/audit-logs` + bảng trên detail PR.
-- Audit detail by entity. **Đã có:** query filter + link từ detail PR.
-- Permission guard cơ bản. **Đã có:** `PHASE5_WRITE_SECRET` (tuỳ chọn, bật trên môi trường shared).
+- Purchase detail `/purchase-requests/[id]` + tóm tắt “ai được notify”, cảnh báo `missing_notification_routing`, hiển thị phê duyệt cấp 1 nếu có.
+- Workflows + audit-logs.
+- n8n + audit notification.
+- JWT + login web + tường đăng nhập tùy `NEXT_PUBLIC_REQUIRE_LOGIN`.
+- Patch schema Postgres + backfill mật khẩu demo cho org user thiếu hash.
+- Neo4j: đồng bộ org trong `sync_seed_graph`.
 
 ## Tiêu chí hoàn thành
 
-Phase 05 đạt khi:
-
-1. Agent tạo purchase request draft.
-2. Người dùng submit request.
-3. Hệ thống xác định approver.
-4. Hệ thống xác định đúng primary contact và backup contact cho asset/rule.
-5. n8n nhận webhook.
-6. Approver approve/reject request.
-7. Audit log ghi đầy đủ từng bước.
-8. UI hiển thị lịch sử thay đổi và người đã/đang được notify.
+1. Agent tạo draft + task; n8n/audit có thể kiểm tra trên môi trường có cấu hình `N8N_WEBHOOK_URL`.
+2. Người submit; với import — hai bước approve đúng nghiệp vụ.
+3. Xác định approver/policy từ dữ liệu (rule + inventory).
+4. Primary/backup từ assignments + fallback; API escalation-check minh họa SLA.
+5. Audit đủ loại sự kiện chính (kể cả notification + thiếu routing).
+6. UI + chat phản ánh routing/guardrail cơ bản.
 
 ## Rủi ro
 
 | Rủi ro | Cách xử lý |
 |---|---|
-| Agent tự động hóa quá mức | Agent chỉ tạo draft, không submit thay người |
-| Thiếu truy vết | Mọi action phải ghi audit log |
-| Notification lỗi làm hỏng workflow | Notification failure không rollback dữ liệu chính |
-| Sai người phê duyệt | Approval policy phải được cấu hình rõ và audit được |
-| Sai người nhận thông báo | Asset owner, primary contact, escalation policy phải được cấu hình rõ và kiểm thử bằng dữ liệu seed |
+| Agent tự động hóa quá mức | Agent chỉ draft; người submit/duyệt |
+| Thiếu truy vết | Audit + viewer |
+| Notification lỗi | Không rollback; audit `notification_failed` |
+| Schema DB cũ | `apply_postgres_schema_patches` + redeploy API |
+| User không đăng nhập được | `password_hash` backfill + `AUTH_ENABLED` / `JWT_SECRET` |
+| Sai người nhận | Cấu hình `asset_contact_assignments` + n8n map payload |
+
+## File tham chiếu nhanh
+
+| Khu vực | File |
+|---------|------|
+| Routing SQL | `apps/api/app/services/routing_context.py` |
+| Notification + audit | `apps/api/app/services/notification_flow.py`, `n8n_webhook.py` |
+| Purchase + 2 cấp | `apps/api/app/services/purchase_workflow.py` |
+| Reasoning + notify sau commit | `apps/api/app/services/reasoning.py` |
+| Schema patch / bootstrap | `apps/api/app/services/schema_patches.py`, `bootstrap.py`, `seed.py` |
+| Auth | `apps/api/app/api/auth.py`, `deps.py`, `core/security.py` |
+| Escalation API | `apps/api/app/api/phase5_routing.py` |
+| Neo4j org | `apps/api/app/services/neo4j_sync.py` |
+| Web login / gate | `apps/web/app/login/page.tsx`, `components/auth-gate.tsx`, `components/admin-shell.tsx`, `lib/api.ts` |

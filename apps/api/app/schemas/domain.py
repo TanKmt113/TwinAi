@@ -73,6 +73,66 @@ class WorkflowActorBody(BaseModel):
     note: str | None = None
 
 
+class OperationalIncidentRead(BaseModel):
+    id: str
+    asset_id: str
+    asset_code: str | None = None
+    incident_kind: str
+    title: str
+    description: str | None
+    severity: str
+    status: str
+    source: str
+    reported_by_actor_type: str
+    reported_by_actor_id: str | None
+    extra_json: dict[str, Any] = Field(default_factory=dict)
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CreateOperationalIncidentBody(WorkflowActorBody):
+    """Báo cáo sự cố vận hành — asset_id có thể là UUID hoặc mã asset (ELV-...)."""
+
+    asset_id: str = Field(min_length=2, max_length=80)
+    incident_kind: str = Field(
+        min_length=2,
+        max_length=80,
+        description="door_fault | elevator_trap | vibration | power_loss | unusual_noise | overspeed | controller_fault | other",
+    )
+    title: str = Field(min_length=3, max_length=255)
+    description: str | None = Field(default=None, max_length=4000)
+    severity: str = Field(default="warning", description="info | warning | critical")
+
+
+class IoTTelemetryIngestBody(BaseModel):
+    """Telemetry từ gateway IoT — ngưỡng xử lý trong `iot_ingest` (demo)."""
+
+    asset_id: str = Field(min_length=2, max_length=80, description="UUID hoặc mã asset (ELV-...)")
+    device_id: str = Field(default="unknown", max_length=120)
+    metric: str = Field(
+        min_length=2,
+        max_length=80,
+        description="vibration_mm_s2 | door_open_seconds | power_voltage_v | overspeed_pct | controller_error_code | noise_db",
+    )
+    value: float
+    unit: str | None = Field(default=None, max_length=40)
+    observed_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class IoTIngestResponse(BaseModel):
+    """Envelope API IoT: { success, data, error } theo convention dự án."""
+
+    success: bool
+    decision: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+
+
 class EscalationCheckBody(BaseModel):
     """Kiểm tra SLA acknowledge → có cần escalate (demo theo policy)."""
 

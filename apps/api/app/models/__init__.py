@@ -11,6 +11,7 @@ from app.models.domain import (
     ManualChunk,
     OrgUnit,
     OrgUser,
+    OperationalIncident,
     PurchaseRequest,
     Rule,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "ManualChunk",
     "OrgUnit",
     "OrgUser",
+    "OperationalIncident",
     "PurchaseRequest",
     "Rule",
 ]

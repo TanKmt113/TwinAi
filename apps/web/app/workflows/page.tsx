@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminShell } from "../../components/admin-shell";
 import { PurchaseRequestsPanel } from "../../components/purchase-requests-panel";
 import { getDashboardData } from "../../lib/api";
@@ -16,6 +17,9 @@ export default async function WorkflowsPage() {
       isOnline={isOnline}
       tag="Human approval gate"
     >
+      <p className="breadcrumb">
+        <Link href="/operational-incidents">Sự cố vận hành (báo sự cố thang) →</Link>
+      </p>
       <section className="metric-grid">
         <article className="metric-card">
           <p>Task mở</p>

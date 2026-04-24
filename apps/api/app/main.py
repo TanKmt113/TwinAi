@@ -5,9 +5,11 @@ from app.api.assets import router as assets_router
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.health import router as health_router
+from app.api.iot import router as iot_router
 from app.api.llm import router as llm_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.manuals import router as manuals_router
+from app.api.operational_incidents import router as operational_incidents_router
 from app.api.org import router as org_router
 from app.api.phase5_routing import router as phase5_routing_router
 from app.api.purchase_requests import router as purchase_requests_router
@@ -44,6 +46,8 @@ app.include_router(manuals_router)
 app.include_router(chat_router)
 app.include_router(llm_router)
 app.include_router(org_router)
+app.include_router(operational_incidents_router)
+app.include_router(iot_router)
 
 
 @app.on_event("startup")

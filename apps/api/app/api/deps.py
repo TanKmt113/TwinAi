@@ -42,6 +42,18 @@ def require_phase5_write_access(
         raise HTTPException(status_code=403, detail="phase5_write_forbidden")
 
 
+def require_iot_ingest_secret(
+    settings: Settings = Depends(get_settings),
+    x_iot_ingest_secret: str | None = Header(default=None, alias="X-IoT-Ingest-Secret"),
+) -> None:
+    """Thiết bị IoT gửi telemetry: bắt buộc header khớp IOT_INGEST_SECRET khi biến môi trường đã cấu hình."""
+    expected = (settings.iot_ingest_secret or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="iot_ingest_disabled")
+    if (x_iot_ingest_secret or "").strip() != expected:
+        raise HTTPException(status_code=403, detail="iot_ingest_forbidden")
+
+
 def get_jwt_role_tags_if_present(
     settings: Settings = Depends(get_settings),
     authorization: str | None = Header(default=None),

@@ -36,6 +36,7 @@ def seed_phase_two_data(db: Session) -> None:
     _get_or_create_assets_and_components(db)
     _get_or_create_inventory(db)
     _get_or_create_rule(db, manual)
+    _get_or_create_operational_incident_policy_rule(db)
     _seed_escalation_policies(db)
     _seed_fake_org_assets_and_components(db)
     _seed_fake_inventory_items(db)
@@ -217,6 +218,37 @@ def _get_or_create_rule(db: Session, manual: Manual) -> None:
             ],
             source_manual_id=manual.id,
             owner_department="Kỹ thuật",
+            status="approved",
+            version=1,
+        )
+    )
+
+
+def _get_or_create_operational_incident_policy_rule(db: Session) -> None:
+    """Rule nghiệp vụ sự cố vận hành — chỉ để catalog DB/ontology; reasoning không đánh giá (condition rỗng)."""
+    if db.scalar(select(Rule).where(Rule.code == "R-ELV-OPS-INCIDENT-01")):
+        return
+    db.add(
+        Rule(
+            code="R-ELV-OPS-INCIDENT-01",
+            name="Tiếp nhận & xử lý sự cố vận hành thang (báo cáo, thông báo, audit)",
+            domain="elevator_operations",
+            condition_json={
+                "_description": "Không gắn component; kích hoạt bởi người vận hành / tích hợp sau.",
+            },
+            action_json=[
+                "create_operational_incident",
+                "route_notification_by_asset",
+                "write_audit_operational_incident_reported",
+            ],
+            evidence_required_json=[
+                "incident_kind",
+                "severity",
+                "asset_reference",
+                "optional_description",
+            ],
+            source_manual_id=None,
+            owner_department="Vận hành",
             status="approved",
             version=1,
         )

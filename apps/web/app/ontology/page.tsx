@@ -12,7 +12,7 @@ export default async function OntologyPage() {
       title="Bản đồ quan hệ dữ liệu"
       status={isOnline ? "API online" : "API offline"}
       isOnline={isOnline}
-      tag="Neo4j"
+      tag="People · Application · Process · Infrastructure"
     >
       <section className="admin-section">
         <div className="section-title-row">
@@ -20,7 +20,7 @@ export default async function OntologyPage() {
             <p className="eyebrow">Graph context</p>
             <h2>{selectedAsset?.name ?? "Chưa có asset"}</h2>
           </div>
-          <span className="module-tag">Asset / Component / Rule / Manual / Purchase</span>
+          <span className="module-tag">Bốn cụm như sơ đồ graph database (có nút vệ tinh & luồng có hướng)</span>
         </div>
         <OntologyMap asset={selectedAsset} ontology={ontology} purchaseRequests={purchaseRequests} />
       </section>

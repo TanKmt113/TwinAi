@@ -64,7 +64,16 @@ function shouldAttachPhase5WriteSecret(method: string, targetPath: string): bool
   if (method !== "POST") {
     return false;
   }
-  return /^api\/purchase-requests\/[^/]+\/(submit|approve|reject|cancel)$/.test(targetPath);
+  if (/^api\/purchase-requests\/[^/]+\/(submit|approve|reject|cancel)$/.test(targetPath)) {
+    return true;
+  }
+  if (targetPath === "api/operational-incidents") {
+    return true;
+  }
+  if (/^api\/operational-incidents\/[^/]+\/(acknowledge|resolve)$/.test(targetPath)) {
+    return true;
+  }
+  return false;
 }
 
 function buildHeaders(request: NextRequest, targetPath: string) {

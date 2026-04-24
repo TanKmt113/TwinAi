@@ -158,6 +158,33 @@ export type WorkflowActorBody = {
   note?: string | null;
 };
 
+export type OperationalIncident = {
+  id: string;
+  asset_id: string;
+  asset_code: string | null;
+  incident_kind: string;
+  title: string;
+  description: string | null;
+  severity: string;
+  status: string;
+  source: string;
+  reported_by_actor_type: string;
+  reported_by_actor_id: string | null;
+  extra_json: Record<string, unknown>;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateOperationalIncidentBody = WorkflowActorBody & {
+  asset_id: string;
+  incident_kind: string;
+  title: string;
+  description?: string | null;
+  severity?: string;
+};
+
 export type LoginResponse = {
   access_token: string;
   token_type: string;
@@ -447,6 +474,88 @@ export async function fetchEscalationPolicyFromServer(idOrCode: string): Promise
   return getServerJsonStrict<EscalationPolicyDetail>(
     `/api/escalation-policies/${encodeURIComponent(idOrCode)}`,
   );
+}
+
+export async function fetchOperationalIncidentsFromServer(params?: {
+  assetId?: string;
+  status?: string;
+  limit?: number;
+}): Promise<OperationalIncident[]> {
+  const q = new URLSearchParams();
+  if (params?.assetId) {
+    q.set("asset_id", params.assetId);
+  }
+  if (params?.status) {
+    q.set("status", params.status);
+  }
+  if (params?.limit) {
+    q.set("limit", String(params.limit));
+  }
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  const rows = await getServerJsonStrict<OperationalIncident[]>(`/api/operational-incidents${suffix}`);
+  return rows ?? [];
+}
+
+export async function reportOperationalIncidentFromBrowser(body: CreateOperationalIncidentBody): Promise<OperationalIncident> {
+  const response = await fetch("/api/backend/api/operational-incidents", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...browserAuthHeaders() },
+    body: JSON.stringify({
+      asset_id: body.asset_id,
+      incident_kind: body.incident_kind,
+      title: body.title,
+      description: body.description ?? null,
+      severity: body.severity ?? "warning",
+      actor_type: body.actor_type ?? "user",
+      actor_id: body.actor_id ?? "operator_ui",
+      note: body.note ?? null,
+    }),
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Báo sự cố thất bại (${response.status}): ${t}`);
+  }
+  return response.json();
+}
+
+export async function acknowledgeOperationalIncidentFromBrowser(
+  incidentId: string,
+  body: WorkflowActorBody = {},
+): Promise<OperationalIncident> {
+  const response = await fetch(`/api/backend/api/operational-incidents/${encodeURIComponent(incidentId)}/acknowledge`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...browserAuthHeaders() },
+    body: JSON.stringify({
+      actor_type: body.actor_type ?? "user",
+      actor_id: body.actor_id ?? "operator_ui",
+      note: body.note ?? null,
+    }),
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Ack thất bại (${response.status}): ${t}`);
+  }
+  return response.json();
+}
+
+export async function resolveOperationalIncidentFromBrowser(
+  incidentId: string,
+  body: WorkflowActorBody = {},
+): Promise<OperationalIncident> {
+  const response = await fetch(`/api/backend/api/operational-incidents/${encodeURIComponent(incidentId)}/resolve`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...browserAuthHeaders() },
+    body: JSON.stringify({
+      actor_type: body.actor_type ?? "user",
+      actor_id: body.actor_id ?? "operator_ui",
+      note: body.note ?? null,
+    }),
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Resolve thất bại (${response.status}): ${t}`);
+  }
+  return response.json();
 }
 
 async function getServerJsonStrict<T>(path: string): Promise<T | null> {

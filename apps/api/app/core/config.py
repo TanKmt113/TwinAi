@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = Field(default="gemini-embedding-001", alias="GEMINI_EMBEDDING_MODEL")
     n8n_webhook_url: str = Field(default="", alias="N8N_WEBHOOK_URL")
     phase5_write_secret: str = Field(default="", alias="PHASE5_WRITE_SECRET")
+    iot_ingest_secret: str = Field(default="", alias="IOT_INGEST_SECRET")
+    iot_incident_cooldown_seconds: int = Field(default=900, ge=60, le=86400, alias="IOT_INCIDENT_COOLDOWN_SECONDS")
     auth_enabled: bool = Field(default=False, alias="AUTH_ENABLED")
     jwt_secret: str = Field(default="", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")

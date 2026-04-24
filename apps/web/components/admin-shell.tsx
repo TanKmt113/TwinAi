@@ -21,6 +21,7 @@ const navItems = [
   { href: "/ontology", label: "Ontology" },
   { href: "/manuals", label: "Manual / RAG" },
   { href: "/workflows", label: "Task / Mua hàng" },
+  { href: "/operational-incidents", label: "Sự cố vận hành" },
   { href: "/audit-logs", label: "Audit log" },
 ];
 

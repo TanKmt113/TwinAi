@@ -134,6 +134,28 @@ class InspectionTask(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class OperationalIncident(Base):
+    """Sự cố / sự kiện khi vận hành thang (báo từ vận hành hoặc tích hợp sau này)."""
+
+    __tablename__ = "operational_incidents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4)
+    asset_id: Mapped[str] = mapped_column(String(36), ForeignKey("assets.id"), nullable=False, index=True)
+    incident_kind: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(40), nullable=False, default="warning")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="open")
+    source: Mapped[str] = mapped_column(String(40), nullable=False, default="operator_ui")
+    reported_by_actor_type: Mapped[str] = mapped_column(String(40), nullable=False, default="user")
+    reported_by_actor_id: Mapped[str | None] = mapped_column(String(120))
+    extra_json: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
 
