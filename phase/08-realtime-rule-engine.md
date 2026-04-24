@@ -4,6 +4,16 @@
 
 Biến telemetry thành hành động vận hành có căn cứ.
 
+## Trạng thái tài liệu
+
+Phase này hiện là **roadmap chưa implement đầy đủ** trong code.
+
+Phân biệt với code hiện tại:
+
+- Repo hiện có reasoning rule cho vòng đời linh kiện `R-ELV-CABLE-001`.
+- Repo cũng có nhánh `iot_ingest` so ngưỡng tĩnh và tạo `OperationalIncident`.
+- Nhưng hiện **chưa có** `SensorAlert`, realtime rule engine theo `window/min_samples`, hay sync `Sensor/SensorAlert` vào Neo4j như phase này yêu cầu.
+
 Phase này thêm rule realtime từ sensor, tạo alert, đồng bộ quan hệ sensor vào Neo4j và cho phép chat dùng telemetry evidence.
 
 ## Phạm vi

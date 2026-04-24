@@ -1,5 +1,12 @@
 # Kế hoạch hành động
 
+## Ghi chú trạng thái hiện tại
+
+Kế hoạch này là khung triển khai theo logic nghiệp vụ. So với repo hiện tại:
+
+- các bước từ ontology, rule engine, dashboard, chat/RAG đến approval/routing/audit đã được triển khai một phần hoặc phần lớn,
+- phần telemetry realtime và 3D Twin vẫn nên được xem là giai đoạn sau, không phải phần đã hoàn tất.
+
 ## Nguyên tắc thực thi
 
 Dự án phải bắt đầu từ vấn đề thực tế của từng bộ phận, không bắt đầu từ việc chọn framework hay viết code. Mỗi bước kỹ thuật phải phục vụ việc biến tri thức vận hành thành logic có thể kiểm chứng.
@@ -125,3 +132,7 @@ Trách nhiệm:
 3. Demo 3: Hệ thống tự phát hiện điều kiện cần kiểm tra.
 4. Demo 4: Agent tạo đề xuất hành động và luồng phê duyệt.
 
+Gợi ý cập nhật theo repo hiện tại:
+
+- Demo 1-4 hiện là mốc đã khá gần với code hiện có.
+- Mốc về telemetry realtime, sensor alert và 3D twin nên tách thành wave tiếp theo sau MVP vận hành.

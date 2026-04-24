@@ -2,6 +2,15 @@
 
 Thư mục này gồm các file Markdown phân tích từ tài liệu `Biên bản họp ngày 17.04.2026.docx`.
 
+Lưu ý:
+
+- Đây là bộ **tài liệu định hướng và thiết kế tổng quan**.
+- Không phải mọi nội dung trong đây đều đã được implement trong code hiện tại.
+- Trạng thái repo hiện tại:
+  - đã chắc ở Phase 01-04,
+  - đã có nhiều phần của Phase 05,
+  - phần Digital Twin realtime và 3D ở Phase 07-10 vẫn chủ yếu là roadmap.
+
 ## Danh sách file
 
 - `01-tom-tat-dieu-hanh.md`: tóm tắt các kết luận và việc cần làm ngay.

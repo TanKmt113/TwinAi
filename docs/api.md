@@ -1,6 +1,8 @@
-# API Phase 1
+# API trạng thái hiện tại
 
-## Health
+Tài liệu này mô tả **API đang có thật trong code hiện tại** và tách riêng phần **roadmap chưa implement** để tránh nhầm giữa spec và implementation.
+
+## Core / Health
 
 ```text
 GET /
@@ -9,7 +11,7 @@ GET /health/dependencies
 GET /health/services
 ```
 
-## Phase 2
+## Phase 02: Asset + Reasoning
 
 ```text
 GET  /api/assets
@@ -22,7 +24,7 @@ GET  /api/inspection-tasks
 GET  /api/purchase-requests
 ```
 
-## Frontend proxy Phase 3
+## Frontend proxy
 
 Next.js frontend có proxy route:
 
@@ -44,7 +46,7 @@ POST http://backend:8000/api/reasoning/run
 
 Lý do: trong Docker, hostname `backend` chỉ truy cập được từ server/container, không truy cập trực tiếp được từ browser.
 
-## Phase 4 Manual + RAG + Chat
+## Phase 04: Manual + RAG + Chat
 
 ```text
 POST /api/manuals/upload
@@ -56,7 +58,7 @@ POST /api/chat/query
 GET  /api/llm/health
 ```
 
-## Organization (đọc — bổ sung trước Phase 05 đầy đủ)
+## Organization (đọc)
 
 ```text
 GET  /api/org/units
@@ -66,13 +68,14 @@ GET  /api/org/users
 - `OrgUnitRead`: `id`, `code`, `name`, `level_kind` (`holding` | `branch` | `department` | `team`), `parent_id`, `sort_order`.
 - `OrgUserRead`: `user_code`, `full_name`, `email`, `job_title`, `org_unit_id`, `org_unit_code`, `org_unit_name`, `manager_user_id`, `manager_user_code`, `role_tags`, `is_active`.
 
-Dữ liệu demo từ `seed_phase_two_data` (idempotent). Chat/reasoning **chưa** tự resolve approver/contact từ các bảng này.
+Dữ liệu demo từ `seed_phase_two_data` (idempotent). Chat/reasoning hiện đã dùng routing context ở mức guardrail/contact MVP, nhưng chưa có approval orchestrator tổng quát như kiến trúc mục tiêu.
 
-## Phase 05 Approval + Org Routing + Notification + Audit
+## Phase 05: Approval + Org Routing + Notification + Audit
 
 Backend đã có các endpoint sau. Web gọi qua proxy `POST /api/backend/api/...` (xem mục Frontend proxy).
 
-- Sau khi commit transaction chính (submit/approve/reject), backend gọi webhook n8n (`N8N_WEBHOOK_URL`); lỗi gửi webhook không rollback DB và được ghi audit `notification_failed` khi áp dụng.
+- Sau khi commit transaction chính (submit/approve/reject), backend gọi webhook n8n (`N8N_WEBHOOK_URL`).
+- Lỗi gửi webhook không rollback DB và được ghi audit `notification_failed` khi áp dụng.
 
 ```text
 GET  /api/purchase-requests
@@ -98,7 +101,44 @@ Body workflow (submit/approve/reject/cancel): `WorkflowActorBody` — `actor_typ
 
 **PHASE5_WRITE_SECRET (tuỳ chọn):** nếu biến môi trường được set, mọi POST submit/approve/reject/cancel bắt buộc header `X-Phase5-Write-Secret` trùng giá trị. Frontend Next có thể set cùng secret để proxy `/api/backend/...` tự gắn header.
 
-## Phase 07 Realtime Sensor + Telemetry
+## IoT incident demo (đã implement)
+
+Nhánh này là ingest IoT đơn giản để tạo sự cố vận hành, **không phải** telemetry pipeline Digital Twin theo Phase 07-10.
+
+```text
+POST /api/iot/telemetry
+```
+
+Payload hiện tại:
+
+```json
+{
+  "asset_id": "ELV-CALIDAS-01",
+  "device_id": "vib-01",
+  "metric": "vibration_mm_s2",
+  "value": 12.0,
+  "unit": "mm/s2"
+}
+```
+
+Hành vi hiện tại:
+
+- nhận một metric đơn,
+- so ngưỡng tĩnh trong code,
+- nếu vượt ngưỡng thì tạo `OperationalIncident`,
+- ghi audit và có thể route notification.
+
+Giới hạn hiện tại:
+
+- không có `Sensor`, `SensorReading`, `SensorAlert`,
+- không có time-series history,
+- không có `window_minutes` / `min_samples`,
+- không sync sensor/alert vào Neo4j,
+- không bind sang 3D twin.
+
+## Phase 07-09 (roadmap only)
+
+Các API dưới đây hiện **chưa có endpoint tương ứng trong backend**, mới tồn tại trong phase/docs thiết kế:
 
 ```text
 GET  /api/sensors
@@ -109,7 +149,7 @@ GET  /api/assets/{asset_id}/telemetry/latest
 GET  /api/assets/{asset_id}/telemetry/history?sensor_code={code}&from={iso}&to={iso}
 ```
 
-Payload `POST /api/telemetry/readings`:
+Payload mục tiêu `POST /api/telemetry/readings`:
 
 ```json
 {
@@ -123,7 +163,7 @@ Payload `POST /api/telemetry/readings`:
 }
 ```
 
-## Phase 08 Realtime Rule Engine
+Roadmap realtime rule:
 
 ```text
 GET  /api/sensor-alerts
@@ -133,18 +173,11 @@ POST /api/sensor-alerts/{alert_id}/resolve
 POST /api/realtime-rules/evaluate
 ```
 
-## Phase 09 3D Digital Twin
+Roadmap 3D Twin:
 
-Frontend dùng các API hiện có và API telemetry:
-
-```text
-GET /api/assets/{asset_id}
-GET /api/assets/{asset_id}/ontology
-GET /api/assets/{asset_id}/telemetry/latest
-GET /api/sensor-alerts?asset_id={asset_id}&status=open
-```
-
-Realtime nâng cấp:
+- frontend sẽ dùng lại `GET /api/assets/{asset_id}` và `GET /api/assets/{asset_id}/ontology`,
+- đồng thời cần thêm telemetry/alert API như trên,
+- có thể bổ sung realtime stream endpoint:
 
 ```text
 GET /api/realtime/assets/{asset_id}/events
@@ -193,7 +226,7 @@ Response:
 
 ## `POST /api/reasoning/run`
 
-Chạy rule `R-ELV-CABLE-001` trên dữ liệu thang máy.
+Chạy rule deterministic `R-ELV-CABLE-001` trên dữ liệu thang máy.
 
 Kết quả mong muốn:
 
@@ -201,6 +234,11 @@ Kết quả mong muốn:
 - 1 task kiểm tra.
 - 1 purchase request draft.
 - Audit log cho hành động agent.
+
+Lưu ý:
+
+- Đây là reasoning nghiệp vụ theo tuổi thọ linh kiện và tồn kho.
+- Đây **không phải** realtime rule engine từ sensor/telemetry.
 
 ## `GET /health`
 

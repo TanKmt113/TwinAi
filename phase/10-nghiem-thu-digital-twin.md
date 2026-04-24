@@ -8,6 +8,12 @@ Xác nhận phần mở rộng Digital Twin chạy đúng end-to-end:
 Sensor -> Telemetry -> Realtime Rule -> Neo4j Ontology -> Alert/Task -> 3D Twin -> Chat
 ```
 
+## Trạng thái tài liệu
+
+Đây là **checklist nghiệm thu roadmap**, chưa phải checklist cho phần code hiện đã có trong repo.
+
+Hiện tại repo mới có nhánh IoT incident demo và MVP vận hành; chưa có pipeline Digital Twin đầy đủ để chạy checklist này.
+
 ## Kịch bản nghiệm thu chính
 
 ### Bước 1: Kiểm tra sensor seed

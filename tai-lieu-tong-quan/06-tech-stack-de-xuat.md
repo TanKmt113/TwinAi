@@ -2,6 +2,18 @@
 
 Tài liệu này đề xuất nền tảng kỹ thuật để chuyển bản demo Agentic AI bảo trì thang máy thành một hệ thống thực tế có thể triển khai nội bộ.
 
+## Ghi chú trạng thái hiện tại
+
+Đây là tài liệu **đề xuất stack mục tiêu**, không phải mô tả 1:1 stack đang chạy trong repo.
+
+So với code hiện tại:
+
+- backend FastAPI, PostgreSQL, Neo4j, MinIO vẫn đúng hướng,
+- vector search hiện đi theo `pgvector`,
+- LLM/embedding hiện hỗ trợ cả OpenAI và Gemini,
+- parser manual trong code hiện tại đơn giản hơn blueprint Docling/Unstructured + OCR,
+- telemetry realtime, MQTT, 3D twin và các thành phần Digital Twin vẫn là phase sau.
+
 ## 1. Mục tiêu kỹ thuật
 
 Hệ thống cần đạt các mục tiêu sau:

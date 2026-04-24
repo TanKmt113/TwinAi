@@ -4,6 +4,10 @@
 
 Xác nhận toàn bộ hệ thống MVP chạy đúng kịch bản end-to-end.
 
+## Trạng thái tài liệu
+
+File này mô tả **kịch bản nghiệm thu cho MVP vận hành** đã/đang triển khai trong repo. Nó không bao gồm Digital Twin realtime đầy đủ; phần đó thuộc Phase 07-10.
+
 ## Kịch bản nghiệm thu chính
 
 ### Bước 1: Mở dashboard
@@ -159,4 +163,3 @@ MVP chưa đạt nếu:
 - Chat trả lời không có citations.
 - Không có audit log.
 - Agent tự động gửi đơn mua hàng thật khi chưa phê duyệt.
-

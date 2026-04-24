@@ -1,5 +1,13 @@
 # Thiết kế MVP Agentic AI
 
+## Ghi chú trạng thái hiện tại
+
+Tài liệu này mô tả **thiết kế MVP mục tiêu**. So với code hiện tại:
+
+- các phần Asset/Component/Rule/Manual/RAG/Chat/Task/Purchase đã có implementation chính,
+- approval/routing/audit cũng đã có một phần đáng kể,
+- còn phần realtime telemetry / Digital Twin chưa nằm trong phạm vi MVP đang chạy thật.
+
 ## Mục tiêu MVP
 
 Xây dựng một hệ thống nhỏ có khả năng:
@@ -143,3 +151,7 @@ MVP được xem là đạt nếu có thể:
 - Tạo được đề xuất hành động rõ ràng.
 - Phân biệt được trường hợp đủ thông tin và thiếu thông tin.
 
+Ghi chú:
+
+- Các tiêu chí trên hiện khớp với hướng `agentic operations MVP`.
+- Không nên đọc tài liệu này như cam kết rằng repo hiện đã có sensor telemetry hoặc 3D twin.

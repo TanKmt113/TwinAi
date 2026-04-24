@@ -4,6 +4,13 @@
 
 Chia hệ thống MVP Agentic AI Ontology thành các giai đoạn phát triển có thể triển khai, kiểm thử và nghiệm thu độc lập.
 
+## Trạng thái hiện tại của repo
+
+- Phase 01-04: đã có implementation chính trong code.
+- Phase 05: đã có nhiều phần chạy thật, gồm approval workflow MVP, org routing, audit log, notification và login JWT MVP.
+- Phase 07-10: vẫn là roadmap Digital Twin, chưa có implementation đầy đủ trong repo.
+- `POST /api/iot/telemetry` hiện có chỉ là nhánh IoT incident demo, không thay thế cho Phase 07-10.
+
 ## Nguyên tắc triển khai
 
 1. Ontology và Rule Engine đi trước LLM.

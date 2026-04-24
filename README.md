@@ -2,9 +2,13 @@
 
 Codebase MVP cho hệ thống Agentic AI Ontology nội bộ.
 
-Phase hiện tại: **Phase 04 - Manual + RAG + Chat**.
+Trạng thái thực tế hiện tại:
 
-Roadmap mở rộng đã bổ sung **Phase 07-10** cho Digital Twin realtime sensor và mô phỏng 3D.
+- **Đã implement chắc:** Phase 01-04.
+- **Đã implement một phần đáng kể:** Phase 05 (approval, routing, notification, audit, login JWT MVP).
+- **Chưa implement theo đúng roadmap Digital Twin:** Phase 07-10.
+
+Roadmap mở rộng vẫn giữ **Phase 07-10** cho Digital Twin realtime sensor và mô phỏng 3D, nhưng các phần này hiện chủ yếu mới ở mức tài liệu thiết kế.
 
 ## Cấu trúc chính
 
@@ -17,7 +21,7 @@ docs/         Tài liệu kỹ thuật triển khai
 phase/        Kế hoạch phát triển theo phase
 ```
 
-## Chạy Phase 1
+## Chạy stack hiện tại
 
 ```bash
 cd infra
@@ -41,7 +45,7 @@ curl http://localhost:8000/health
 curl http://localhost:8000/health/dependencies
 ```
 
-## Phase 3 Dashboard
+## Dashboard hiện có
 
 Frontend tại:
 
@@ -73,7 +77,7 @@ curl http://localhost:8000/api/inspection-tasks
 curl http://localhost:8000/api/purchase-requests
 ```
 
-## Phase 4 API
+## Chat / RAG API
 
 ```bash
 curl http://localhost:8000/api/manuals
@@ -92,7 +96,7 @@ GEMINI_API_KEY=... docker compose up --build
 LLM_PROVIDER=openai OPENAI_API_KEY=... docker compose up --build
 ```
 
-Phase 2 đã thêm:
+Phase 02 đã thêm:
 
 - PostgreSQL schema nghiệp vụ bằng SQLAlchemy.
 - Seed data thang máy từ tài liệu 07.
@@ -100,9 +104,18 @@ Phase 2 đã thêm:
 - Rule Engine `R-ELV-CABLE-001`.
 - API `POST /api/reasoning/run`.
 
-## Phase tiếp theo
+## Phase 05 hiện trạng
 
-Phase 05 sẽ thêm approval UI, org routing/escalation, notification qua n8n và audit log viewer. Phần này hiện mới ở mức tài liệu thiết kế, chưa có code backend/frontend tương ứng.
+Repo hiện đã có nhiều phần của Phase 05:
+
+- Purchase lifecycle: submit / approve / reject / cancel.
+- Dual approval cho vật tư import.
+- Org routing MVP theo SQL seed.
+- Notification qua n8n theo kiểu best-effort.
+- Audit log API + UI.
+- Login JWT MVP và bảo vệ một số luồng write.
+
+Tuy nhiên đây vẫn là MVP vận hành, chưa phải orchestration enterprise hoàn chỉnh như sơ đồ mục tiêu.
 
 ## Digital Twin mở rộng
 
@@ -115,7 +128,7 @@ Phase 09: 3D Digital Twin
 Phase 10: Nghiệm thu Digital Twin
 ```
 
-Mục tiêu mở rộng:
+Mục tiêu roadmap:
 
 - Nhận sensor reading cho thang máy/linh kiện.
 - Lưu latest/history telemetry.
@@ -124,7 +137,7 @@ Mục tiêu mở rộng:
 - Hiển thị 3D Digital Twin bằng Three.js.
 - Bind trạng thái 3D theo telemetry và alert.
 
-Luồng mục tiêu:
+Luồng mục tiêu theo thiết kế:
 
 ```text
 Sensor reading
@@ -135,3 +148,13 @@ Sensor reading
   -> 3D Twin đổi trạng thái
   -> Chat trả lời có telemetry evidence
 ```
+
+Lưu ý quan trọng:
+
+- Trong code hiện tại **chưa có** model/API đầy đủ cho `Sensor`, `SensorReading`, `SensorAlert`, realtime rule engine và 3D twin như luồng trên.
+- Phần gần nhất với telemetry hiện nay là `POST /api/iot/telemetry`, đây là luồng **IoT incident demo**:
+  - nhận metric đơn,
+  - so ngưỡng tĩnh trong code,
+  - tạo `OperationalIncident`,
+  - có thể route notification.
+- Luồng IoT demo này **không tương đương** kiến trúc Digital Twin realtime đầy đủ của Phase 07-10.

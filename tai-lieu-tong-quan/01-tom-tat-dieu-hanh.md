@@ -10,6 +10,19 @@ Buổi họp xác định một hướng đi mới cho đội AI: không xây th
 
 Trong tư duy này, Ontology là xương sống logic của hệ thống. LLM chỉ là lớp giao diện ngôn ngữ tự nhiên và hỗ trợ diễn giải. Hệ thống không được đưa ra quyết định quan trọng chỉ dựa trên xác suất của LLM, vì LLM có nguy cơ ảo giác và không đảm bảo tính đúng đắn logic.
 
+## Ghi chú trạng thái hiện tại
+
+Theo code hiện tại, hướng đi này đã được hiện thực hóa tốt ở phần **Agentic Operations MVP**:
+
+- dashboard vận hành,
+- ontology map,
+- rule engine deterministic,
+- task/purchase draft,
+- chat/RAG có citations,
+- approval/routing/audit ở mức MVP.
+
+Phần **Digital Twin realtime đầy đủ** với sensor model, telemetry history, realtime rule engine, sensor alert và 3D twin vẫn là bước tiếp theo, chưa có implementation hoàn chỉnh trong repo hiện tại.
+
 ## Thông điệp quan trọng từ Chairman
 
 1. Thị trường đang dịch chuyển từ "bán công cụ" sang "bán kết quả".
@@ -57,4 +70,3 @@ Ví dụ mẫu: thang máy sắp hết tuổi thọ cáp kéo thì hệ thống 
 5. Xây quy tắc suy luận có căn cứ từ manual.
 6. Tạo lớp LLM chỉ để truy vấn, diễn giải và trình bày kết quả.
 7. Thiết lập quy trình hiệu chỉnh để dạy AI hiểu đúng format và ngữ nghĩa nội bộ.
-

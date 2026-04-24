@@ -4,6 +4,15 @@
 
 Mở rộng MVP từ Ontology vận hành sang Digital Twin có trạng thái realtime.
 
+## Trạng thái tài liệu
+
+Phase này hiện là **roadmap chưa implement đầy đủ** trong code.
+
+Phân biệt với code hiện tại:
+
+- Repo có `POST /api/iot/telemetry`, nhưng đó là ingest metric đơn để tạo `OperationalIncident`.
+- Nhánh IoT hiện tại **không có** model `Sensor` / `SensorReading`, history API chuẩn hoặc telemetry panel đúng nghĩa như phase này mô tả.
+
 Phase này tập trung nhận, lưu và hiển thị dữ liệu sensor. Chưa cần mô phỏng 3D và chưa cần MQTT thật nếu chưa có thiết bị.
 
 ## Phạm vi

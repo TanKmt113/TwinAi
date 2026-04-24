@@ -4,6 +4,15 @@
 
 Thêm mô phỏng 3D thang máy để người dùng nhìn thấy trạng thái Digital Twin trực quan.
 
+## Trạng thái tài liệu
+
+Phase này hiện là **roadmap chưa implement** trong frontend/backend hiện tại.
+
+Điều kiện tiên quyết:
+
+- chỉ nên triển khai sau khi Phase 07-08 có model/API telemetry và alert thật,
+- không dùng 3D như minh họa độc lập nếu chưa có dữ liệu trạng thái từ backend.
+
 3D trong phase này không thay thế dashboard, ontology map hoặc rule engine. Nó là một view vận hành đọc dữ liệu từ Asset/Component/Sensor/Alert.
 
 ## Nguyên tắc

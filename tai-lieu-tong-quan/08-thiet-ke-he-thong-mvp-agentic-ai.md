@@ -8,6 +8,25 @@ Tài liệu này thiết kế hệ thống MVP dựa trên:
 
 Phạm vi thiết kế: hệ thống nội bộ cho use case **bảo trì thang máy - cảnh báo cáp kéo sắp hết tuổi thọ - tạo task kiểm tra - đề xuất mua hàng - phê duyệt - thông báo/escalation đúng người phụ trách**.
 
+## 0. Ghi chú trạng thái triển khai
+
+Tài liệu này mô tả **kiến trúc mục tiêu và blueprint triển khai**.
+
+So với code hiện tại:
+
+- đã có implementation chắc cho phần Asset/Component/Rule/Manual/Chat/RAG/Task/Purchase,
+- đã có nhiều phần của approval, org routing, notification và audit,
+- chưa có implementation đầy đủ cho telemetry realtime, sensor alert, realtime rule engine và 3D Twin.
+
+Nhánh gần nhất với realtime hiện có trong repo là `POST /api/iot/telemetry`, nhưng đây chỉ là **IoT incident demo**:
+
+- nhận metric đơn,
+- so ngưỡng tĩnh trong code,
+- tạo `OperationalIncident`,
+- route notification/audit.
+
+Nó không tương đương với Digital Twin pipeline đầy đủ của Phase 07-10.
+
 ## 1. Mục tiêu hệ thống
 
 Hệ thống MVP cần chứng minh được 6 năng lực:
@@ -62,7 +81,7 @@ Người có thẩm quyền phải phê duyệt trước khi chuyển thành hà
 
 ## 3. Tech stack sử dụng
 
-### 3.1. MVP stack
+### 3.1. MVP stack mục tiêu
 
 ```text
 Frontend: Next.js + React
@@ -79,7 +98,16 @@ Automation: n8n webhook
 Deploy: Docker Compose nội bộ
 ```
 
-### 3.2. Lý do chọn stack này
+### 3.2. Ghi chú về stack trong code hiện tại
+
+Repo hiện tại có một số khác biệt thực dụng so với stack mục tiêu ở trên:
+
+- parse manual đang dùng các parser đơn giản hơn cho `txt`, `md`, `csv`, `pdf`, `docx`,
+- LLM/embedding đang hỗ trợ cả OpenAI và Gemini,
+- chưa có implementation TimescaleDB, MQTT hay 3D Twin thật trong repo,
+- phần quan trọng là ranh giới quyết định nghiệp vụ vẫn giữ đúng: rule engine và domain service quyết định, LLM chỉ diễn giải/gọi tool.
+
+### 3.3. Lý do chọn stack này
 
 - **Next.js**: phù hợp dashboard nội bộ, form quản trị, màn hình phê duyệt.
 - **FastAPI**: phù hợp AI pipeline, rule engine, API rõ schema.
@@ -99,13 +127,13 @@ Digital Twin realtime mở rộng ở Phase 07-10]
 ┌─────────────────────────────────────────────────────────────┐
 │                         Next.js UI                          │
 │ Dashboard | Ontology Map | Chat | Task | Purchase | Admin    │
-│ Approval Queue | Notification/Escalation | Telemetry | 3D Twin│
+│ Approval Queue | Notification/Escalation | Telemetry* | 3D Twin*│
 └──────────────────────────────┬──────────────────────────────┘
                                │ REST/JSON, polling/SSE/WebSocket
 ┌──────────────────────────────▼──────────────────────────────┐
 │                         FastAPI API                         │
 │ Auth | Asset API | Manual API | Rule API | Chat API          │
-│ Org API | Approval API | Audit API | Telemetry API | Twin API │
+│ Org API | Approval API | Audit API | Telemetry API* | Twin API*│
 └──────────────────────────────┬──────────────────────────────┘
                                │ user request / job / reading
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -130,7 +158,7 @@ Digital Twin realtime mở rộng ở Phase 07-10]
 │  - tìm policy/approver        - route contact/escalation      │
 │  - human gate                 - gửi n8n webhook, ghi trạng thái│
 │                                                             │
-│  Telemetry Agent ───────────▶ Realtime Rule Agent            │
+│  Telemetry Agent* ──────────▶ Realtime Rule Agent*           │
 │  - nhận sensor reading        - kiểm tra threshold/window     │
 │  - chuẩn hóa metric/quality   - tạo/update SensorAlert        │
 │  - attach evidence            - kích hoạt task/chat context   │
@@ -140,7 +168,7 @@ Digital Twin realtime mở rộng ở Phase 07-10]
 │                    Backend Domain Services                  │
 │ Ontology Service | Rule Engine | RAG Service | Purchase API  │
 │ Approval | Org Routing | Audit | Notification | Telemetry    │
-│ Realtime Rules | Sensor Alert | 3D Twin State | Object Store │
+│ Realtime Rules* | Sensor Alert* | 3D Twin State* | Object Store │
 └──────────────┬───────────────┬───────────────┬──────────────┘
                │               │               │
 ┌──────────────▼───┐   ┌───────▼────────┐  ┌───▼──────────────┐
@@ -148,8 +176,8 @@ Digital Twin realtime mở rộng ở Phase 07-10]
 │ business data    │   │ manual files   │  │ LLM + embedding   │
 │ pgvector         │   │ originals      │  │ tool-call JSON    │
 │ org/audit data   │   └────────────────┘  └──────────────────┘
-│ telemetry        │
-│ sensor_alerts    │   ┌────────────────┐  ┌──────────────────┐
+│ telemetry*       │
+│ sensor_alerts*   │   ┌────────────────┐  ┌──────────────────┐
 │ agent_runs/events│   │ TimescaleDB     │  │ MQTT / Simulator │
 └──────────────┬───┘   │ optional later  │  │ optional ingest   │
                │       │ high-volume TS  │  │ Phase 07-10       │
@@ -168,13 +196,15 @@ Digital Twin realtime mở rộng ở Phase 07-10]
 └──────────────────────────────────────────────────────────────┘
 ```
 
+`*` là phần roadmap hoặc mới có bản demo một phần, chưa phải implementation đầy đủ trong repo hiện tại.
+
 Ghi chú quan trọng:
 
 - LLM chỉ nằm ở lớp giao tiếp và tổng hợp phản hồi. Quyết định nghiệp vụ phải đi qua Rule Engine, Ontology, Domain Service và human approval.
-- PostgreSQL là source of record cho dữ liệu giao dịch, audit, org, purchase request và telemetry MVP. TimescaleDB chỉ là lựa chọn nâng cấp khi sensor readings tăng lớn.
-- Neo4j lưu quan hệ Ontology, quan hệ Asset/Component/Sensor/Rule/Alert và trạng thái tổng hợp; không lưu từng sensor reading dày đặc.
-- 3D Twin là view vận hành đọc từ telemetry, SensorAlert và ontology mapping. 3D không được hard-code trạng thái cảnh báo.
-- MQTT/simulator là nguồn ingest tùy phase. MVP có thể bắt đầu bằng `POST /api/telemetry/readings` và polling 3-5 giây.
+- PostgreSQL là source of record cho dữ liệu giao dịch, audit, org, purchase request trong code hiện tại. Telemetry chuẩn vẫn là roadmap.
+- Neo4j lưu quan hệ Ontology; phần Sensor/Rule/Alert graph là thiết kế mục tiêu cho phase sau.
+- 3D Twin là view vận hành đọc từ telemetry, SensorAlert và ontology mapping khi được triển khai. 3D không được hard-code trạng thái cảnh báo.
+- MQTT/simulator là nguồn ingest tùy phase. Trong code hiện tại chưa có `POST /api/telemetry/readings`; nhánh gần nhất là `POST /api/iot/telemetry` theo kiểu incident demo.
 
 ## 5. Module hệ thống
 
